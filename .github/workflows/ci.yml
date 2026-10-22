@@ -62,3 +62,42 @@ jobs:
       - name: PHP server log
         if: failure()
         run: cat build/php-server.log || true
+
+  browser:
+    name: Browser playground (Chrome)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, sqlite3, curl, zip, gd, intl, mbstring
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Cache the Joomla package
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: joomla-${{ env.JOOMLA_VERSION }}
+
+      - name: Download the Joomla package
+        run: |
+          file=".cache/Joomla_${JOOMLA_VERSION}-Stable-Full_Package.zip"
+          test -f "$file" || (mkdir -p .cache && curl -sSfL -o "$file" "https://github.com/joomla/joomla-cms/releases/download/${JOOMLA_VERSION}/$(basename "$file")")
+
+      - run: composer install --no-interaction --no-progress
+      - run: npm ci --no-audit --no-fund
+
+      - name: Build the Joomla bundle and the playground
+        run: |
+          npm run bundle
+          npm run web:build
+
+      - name: Browser tests
+        run: npm run test:browser

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Joomla Playground</title>
+  <style>
+    :root {
+      --bar: #1c2b4a;
+      --bar-text: #f2f5fa;
+      --muted: #b9c4d8;
+      --accent: #f9a541;
+      --error: #ff8a80;
+      --page: #ffffff;
+      color-scheme: light;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: var(--page);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 16px;
+      padding: 8px 16px;
+      background: var(--bar);
+      color: var(--bar-text);
+      font-size: 14px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    header button {
+      padding: 4px 12px;
+      border: 1px solid var(--muted);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--bar-text);
+      font: inherit;
+      cursor: pointer;
+    }
+
+    header button:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    #status { color: var(--accent); }
+    #status.error { color: var(--error); white-space: pre-wrap; }
+    #info, #credentials-label { color: var(--muted); }
+    #credentials { font-family: ui-monospace, Consolas, monospace; }
+    .spacer { flex: 1; }
+
+    iframe {
+      flex: 1;
+      width: 100%;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Joomla Playground</h1>
+    <button id="open-site" type="button" disabled>Site</button>
+    <button id="open-admin" type="button" disabled>Administrator</button>
+    <span id="status">Loading</span>
+    <span class="spacer"></span>
+    <span><span id="credentials-label">Super User:</span> <span id="credentials">…</span></span>
+    <span id="info"></span>
+  </header>
+  <iframe id="joomla" title="Joomla"></iframe>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

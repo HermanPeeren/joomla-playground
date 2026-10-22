@@ -1,6 +1,6 @@
 # Joomla Playground — draft build plan
 
-*Starting point for discussion. Builds on [REPORT.md](REPORT.md). Status 2026-10-22: phase 1 steps 1a (Joomla on SQLite), 1b (MySQL emulated on SQLite) and 2 (Joomla in `@php-wasm/node`) done; next is step 3, Joomla in the browser.*
+*Starting point for discussion. Builds on [REPORT.md](REPORT.md). Status 2026-10-22: phase 1 steps 1a (Joomla on SQLite), 1b (MySQL emulated on SQLite), 2 (Joomla in `@php-wasm/node`) and 3 (Joomla in the browser, first version) done; next are a public deployment and the MVP (phase 2).*
 
 ## Goal
 
@@ -123,6 +123,18 @@ unchanged.
   - Load the site into MEMFS instead of NODEFS.
 
 ### Step 3: Joomla in the browser · *3–5 days*
+
+**Done, first version (2026-10-22)** (REPORT §12).
+- **What works:** `web/` runs Joomla in a browser tab. It is ready about 2 s after the page loads (locally) and
+  logs in automatically. Each tab gets its own scope.
+- **Build:** `bin/build-browser-bundle.php` builds the pre-installed bundle.
+- **Tests:** browser tests in headless Chrome, which also run in CI.
+- **Still open from the list below:**
+  - deployment (the GitHub Pages workflow is ready);
+  - Firefox and Safari;
+  - `php -w` and vendor stripping;
+  - `cookie_path`, which the worker's cookie store makes unnecessary for now.
+
 
 - Build script, version 1:
   - Full Package → remove `installation/` → strip `*.gz` and extra languages → `php -w` → split `media/`

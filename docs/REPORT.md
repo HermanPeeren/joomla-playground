@@ -39,6 +39,9 @@ already been done by the WordPress Playground team and can be reused.
 - **Update, 2026-10-22: step 2 is done.** Joomla runs in WebAssembly (`@php-wasm/node`) with both drivers, and
   the full test suite passes there. WebAssembly costs 5–8× natively; the MySQL emulation adds 1.2–1.5× on top.
   See §11.
+- **Update, 2026-10-22: step 3 is done (first version).** Joomla runs in a browser tab: no server-side PHP, and
+  it is ready about 2 s after the page loads (locally). The administrator is logged in automatically. The site,
+  the administrator, forms, AJAX and static media work, and Chrome browser tests cover them. See §12.
 
 ## 2. How WordPress Playground works, and what is reusable
 
@@ -468,7 +471,95 @@ A stays available as the fast fallback.
 **Decided (2026-10-22):** `mysqlonsqlite` is now the installer's default driver; `--driver=playgroundsqlite`
 selects A.
 
-## 12. Sources
+## 12. Step 3 result: Joomla in the browser (2026-10-22)
+
+The playground (`web/`) runs Joomla 6.2.0 entirely in the browser:
+- PHP 8.4 in WebAssembly (`@php-wasm/web` 3.1.60);
+- the `mysqlonsqlite` driver;
+- a pre-installed site, unpacked into PHP's in-memory filesystem.
+
+A static web server is enough: there is no PHP on the server.
+
+**How it works**
+
+```
+ Browser tab  (index.html + main.js: toolbar, status, iframe)
+   iframe -> <playground>/scope-<id>/administrator/...
+       | fetch
+       v
+ Service worker (sw.js)
+   |- /scope-<id>/media/...  -> served directly from the static bundle (joomla/media/)
+   '- everything else        -> BroadcastChannel -> PHP worker of the tab that owns scope-<id>
+                                                    PHPRequestHandler + PHP 8.4 (WebAssembly)
+                                                    site in MEMFS (/var/www/html), SQLite database
+                                                    cookie store: the session stays in the worker
+```
+
+- **Build** (`bin/build-browser-bundle.php`):
+  - installs the Full Package with the default driver and applies playground settings: no update checks, no
+    statistics prompt, no lazy scheduler, no mail;
+  - removes build sources (`.gz`, `.scss`, `.ts`, `.map`) and caches;
+  - packs the PHP part as `site.zip` and copies `media/` as static files.
+- **Media placeholders:** Joomla checks with `is_file()` that media files exist before it links them, so
+  `site.zip` contains empty placeholders for them, plus the real `.json` asset definitions.
+- **Boot** (`php-worker.js`):
+  1. Load PHP.
+  2. Download and unpack `site.zip`.
+  3. Set `live_site` to the tab's scope URL, and the paths to the virtual filesystem.
+  4. Set a new random Super User password.
+  5. Log in through the request handler, so the administrator opens already logged in.
+- **Scopes:** every tab gets its own scope (`scope-<id>`), so tabs run independent sites.
+
+**Size and speed**
+- **On the server:** `web/dist` is 133 MB. That includes PHP's WebAssembly binary in two variants (JSPI and
+  Asyncify, 20 MB each) and the `intl` data (38 MB), which is only loaded when `intl` is enabled.
+- **A visitor downloads:**
+  - one PHP binary (20 MB, 7.7 MB gzipped);
+  - `site.zip` (17.8 MB);
+  - the media files that the pages use (31.7 MB in total).
+- **Boot,** measured in Chrome against a local server, so without network time:
+
+| PHP loaded | site.zip downloaded | unpacked | configured | logged in (ready) |
+|---|---|---|---|---|
+| 0.2 s | 0.3 s | 1.1 s | 1.4 s | 2.0 s |
+
+- **Pages:** like `@php-wasm/node` in step 2, a few hundred ms per page. Creating an article through the
+  administrator form takes about 3 s in the browser test, including loading the form and the article list.
+
+**What had to be solved**
+
+| Problem | Solution |
+|---|---|
+| A single PHP instance rejects a request that arrives while another one runs (`SinglePHPInstanceManager`), so the dashboard's simultaneous AJAX calls got HTTP 500 | Queue the requests in the worker (and in the Node runner), as `php -S` does |
+| Chrome rejects a constructed 3xx `Response` for a page navigation (`ERR_ABORTED`) | The service worker answers redirects with `Response.redirect()` |
+| `administrator/cache/autoload_psr4.php` (Joomla's namespace map) holds absolute build paths: "class does not exist" | The build empties Joomla's caches; Joomla rebuilds them in the browser |
+| Without network, the "Automated Update" dashboard widget blocks PHP for 20 s per call, and the queued requests behind it | `plg_quickicon_autoupdate` is disabled in the bundle, like the other update checks |
+| Joomla only links media files that exist | Empty placeholders in `site.zip`; the service worker serves the real files |
+| Cookies cannot be set by a service worker response | The worker's cookie store (`HttpCookieStore`) keeps the session; the service worker drops `Set-Cookie` |
+| Vite: `@php-wasm/universal` must be pre-bundled (CommonJS dependency `ini`); all PHP versions would be shipped | Only `@php-wasm/web` is excluded from pre-bundling; PHP versions other than 8.4 are aliased to a stub |
+
+**Tests:** `tests/browser/playground.test.mjs` runs the production build in headless Chrome. It covers:
+- boot and auto-login;
+- media served directly with the right content type;
+- saving an article through the administrator form;
+- the article on the site;
+- a second tab getting its own site and database.
+
+CI runs it in a separate job. The Claude desktop app's built-in browser pane does not allow service workers;
+real Chrome does.
+
+**Not yet**
+- **Persistence:** reloading the page starts a new, empty playground.
+- **Outbound network:** no extension installs from a URL, no update checks. This needs `@php-wasm`'s
+  TCP-over-fetch and a CORS proxy.
+- **Speed:** OPcache and JSPI.
+- **Smaller downloads:** strip `libraries/vendor`; `php -w`.
+- **Browser coverage:** Firefox and Safari are untested.
+- **A public URL:** a GitHub Pages workflow is ready (`.github/workflows/pages.yml`). It needs Pages enabled
+  with "GitHub Actions" as the source.
+- **Blueprints and the query API.**
+
+## 13. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)

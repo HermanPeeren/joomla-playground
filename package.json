@@ -7,11 +7,19 @@
   "scripts": {
     "docs:pdf": "node scripts/build-docs.mjs",
     "wasm:serve": "node wasm/serve.mjs",
-    "wasm:cli": "node wasm/cli.mjs"
+    "wasm:cli": "node wasm/cli.mjs",
+    "bundle": "php bin/build-browser-bundle.php",
+    "web:dev": "vite --config web/vite.config.js",
+    "web:build": "vite build --config web/vite.config.js",
+    "web:preview": "vite preview --config web/vite.config.js --port 5401",
+    "test:browser": "node --test --test-timeout=600000 tests/browser/"
   },
   "devDependencies": {
     "@php-wasm/node": "3.1.60",
     "@php-wasm/universal": "3.1.60",
-    "marked": "18.1.1"
+    "@php-wasm/web": "3.1.60",
+    "marked": "18.1.1",
+    "playwright-core": "1.64.1",
+    "vite": "6.4.5"
   }
 }
