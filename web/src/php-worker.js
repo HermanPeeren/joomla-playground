@@ -12,7 +12,7 @@
 // and sends { type: 'progress', message } while it works.
 
 import { PHP, PHPRequestHandler, setPhpIniEntries } from '@php-wasm/universal';
-import { loadWebRuntime } from '@php-wasm/web';
+import { certificateToPEM, generateCertificate, loadWebRuntime } from '@php-wasm/web';
 import { journalFSEvents } from '@php-wasm/fs-journal';
 import { createSpawnHandler } from '@php-wasm/util';
 import { hasBase, readBase, readMeta, readSnapshot, siteLockName, writeBase, writeMeta, writeSnapshot } from './storage.js';
@@ -20,6 +20,8 @@ import { DEFAULT_PHP_VERSION } from './blueprint.js';
 import { BlueprintError, runSteps } from './blueprint-steps.js';
 
 const DOCUMENT_ROOT = '/var/www/html';
+const CA_BUNDLE = '/internal/shared/ca-bundle.crt';
+const PREPEND_FILE = '/internal/shared/playground-prepend.php';
 
 /** Caches, logs and temporary files: left out of exports and snapshots (a PHP regular expression). */
 const SKIP = '#^(tmp|cache|administrator/cache|administrator/logs)/(?!index\\.html$)#';
@@ -105,8 +107,13 @@ async function boot({ base, scope, site = null, title = null, zip = null, php: p
 
   phpVersion = phpVersion ?? meta?.php ?? DEFAULT_PHP_VERSION;
   progress(`Loading PHP ${phpVersion}`);
+  const caRoot = await generateCertificate({
+    subject: { commonName: 'Joomla Playground CA', organizationName: 'Joomla Playground', countryName: 'NL' },
+    basicConstraints: { ca: true },
+  });
   const [php, manifest, files] = await Promise.all([
-    loadWebRuntime(phpVersion).then((runtime) => (lap('php'), new PHP(runtime))),
+    // Outgoing HTTP(S) from PHP goes through the browser's fetch() (see enableNetwork()).
+    loadWebRuntime(phpVersion, { tcpOverFetch: { CAroot: caRoot } }).then((runtime) => (lap('php'), new PHP(runtime))),
     fetch(new URL('joomla/manifest.json', base)).then((response) => response.json()),
     siteFiles({ base, site, meta, zip }).then((files) => (lap(meta ? 'read' : 'download'), files)),
   ]);
@@ -116,6 +123,9 @@ async function boot({ base, scope, site = null, title = null, zip = null, php: p
   if (joomla && !`${manifest.joomla}.`.startsWith(`${joomla}.`)) {
     throw new Error(`Joomla ${joomla} is not available in this playground; it has Joomla ${manifest.joomla}`);
   }
+
+  await enableNetwork(php, caRoot);
+  await prependFile(php, new URL(siteUrl).pathname);
 
   progress(meta ? 'Opening the saved site' : 'Unpacking Joomla');
   php.mkdir(DOCUMENT_ROOT);
@@ -657,6 +667,42 @@ async function catchMail(command, processApi) {
 
   self.postMessage({ type: 'mail', mail: { raw: new TextDecoder().decode(bytes), received: new Date().toISOString() } });
   processApi.exit(0);
+}
+
+/**
+ * PHP has no sockets in the browser. With tcpOverFetch, @php-wasm turns the bytes PHP writes to a socket into a
+ * fetch(): it ends PHP's TLS connection itself, with a certificate for the host signed by the given CA, which PHP
+ * must trust. Without it, a connection never answers and curl waits for its connect timeout of 300 s, which blocks
+ * every following request (e.g. System > Install Languages, which reads the list from update.joomla.org).
+ *
+ * The browser's rules apply: a server must allow cross-origin requests (update.joomla.org does, the language pack
+ * downloads do not). A refused fetch() comes back to PHP at once, as "400 Bad Request".
+ */
+async function enableNetwork(php, caRoot) {
+  php.writeFile(CA_BUNDLE, certificateToPEM(caRoot.certificate));
+  await setPhpIniEntries(php, { 'openssl.cafile': CA_BUNDLE, 'curl.cainfo': CA_BUNDLE });
+}
+
+/**
+ * @php-wasm sets SCRIPT_NAME to the script's path below the document root (/administrator/index.php), without the
+ * path of the site URL (/scope-abc123), which REQUEST_URI and PHP_SELF do have. Joomla takes its base URL from
+ * SCRIPT_NAME, so a redirect to a relative "index.php?..." (e.g. after installing a language or an extension)
+ * would leave the scope and end on a 404 of the web server. A file PHP runs before every script corrects it, and
+ * tells the playground's system plugin that it runs in the browser.
+ */
+async function prependFile(php, sitePath) {
+  php.writeFile(PREPEND_FILE, `<?php
+    $_SERVER['JOOMLA_PLAYGROUND'] = 'browser';
+    $prefix = ${JSON.stringify(sitePath)};
+    if (isset($_SERVER['SCRIPT_NAME']) && !str_starts_with($_SERVER['SCRIPT_NAME'], $prefix . '/')) {
+        $_SERVER['SCRIPT_NAME'] = $prefix . $_SERVER['SCRIPT_NAME'];
+        $path = strtok($_SERVER['REQUEST_URI'] ?? '', '?');
+        if (str_starts_with($path, $_SERVER['SCRIPT_NAME'] . '/')) {
+            $_SERVER['PATH_INFO'] = substr($path, strlen($_SERVER['SCRIPT_NAME']));
+        }
+    }
+  `);
+  await setPhpIniEntries(php, { auto_prepend_file: PREPEND_FILE });
 }
 
 async function runPhp(php, code) {

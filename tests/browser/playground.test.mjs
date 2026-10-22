@@ -144,6 +144,61 @@ describe('Joomla Playground in the browser', () => {
     assert.match(await frame.title(), /Uncategorised|Joomla Playground/);
   });
 
+  test('opens the System dashboard and Install Languages without blocking the playground', async () => {
+    let frame = await openInFrame('/administrator/index.php?option=com_cpanel&view=cpanel&dashboard=system');
+
+    await frame.waitForFunction(() => document.title.includes('System Dashboard'), null, { timeout: 30000 });
+
+    // The list of languages comes from update.joomla.org: PHP's request goes through fetch(). Without networking,
+    // curl waited 300 s for a connection and every other request of the playground waited behind it.
+    const started = Date.now();
+    frame = await openInFrame('/administrator/index.php?option=com_installer&view=languages');
+    await frame.waitForSelector('text=language packs cannot be installed from this list', { timeout: 30000 });
+    console.log(`Install Languages took ${Date.now() - started} ms`);
+
+    // Installing one fails at once (downloads.joomla.org allows no cross-origin requests), and Joomla's redirect
+    // back to the list stays in this playground's scope.
+    const install = frame.locator('#installer-languages tbody tr .btn').first();
+
+    if (await install.count()) {
+      await Promise.all([frame.waitForNavigation({ timeout: 30000 }), install.click()]);
+      await frame.waitForSelector('text=language packs cannot be installed from this list', { timeout: 30000 });
+      assert.ok(frame.url().startsWith(`${playground.siteUrl}/administrator/`), frame.url());
+    }
+
+    assert.equal(await page.evaluate(async (siteUrl) => (await fetch(`${siteUrl}/index.php`)).status, playground.siteUrl), 200);
+  });
+
+  test('installs the Blog Sample Data from the home dashboard', async () => {
+    const frame = await openInFrame('/administrator/index.php');
+
+    // Smart Search indexes the sample articles; it used to print a PHP warning into the JSON of step 1.
+    const steps = [];
+    let last;
+    const collect = async (response) => {
+      if (response.url().includes('group=sampledata')) {
+        steps.push(await response.text().catch((error) => error.message));
+      }
+    };
+
+    page.on('response', collect);
+    page.once('dialog', (dialog) => dialog.accept());
+
+    try {
+      const lastStep = page.waitForResponse((response) => response.url().includes('plugin=SampledataApplyStep4'), { timeout: 120000 });
+      await frame.click('.sampledata-blog .apply-sample-data', { timeout: 30000 });
+      last = await (await lastStep).text();
+    } finally {
+      page.off('response', collect);
+    }
+
+    // Each step answers with plain JSON; the last one says it is done.
+    for (const step of steps) {
+      assert.doesNotThrow(() => JSON.parse(step), step.slice(0, 300));
+    }
+    assert.match(last, /Blog Sample Data has been installed!/);
+  });
+
   test('a second tab gets its own site and database', async () => {
     // Same browser context: same service worker and storage, like a second tab.
     const second = await page.context().newPage();
