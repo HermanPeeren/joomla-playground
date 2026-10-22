@@ -185,6 +185,8 @@ pitch to the Joomla production department.
   - **Done (2026-10-22)** (REPORT §15): PHP's sendmail is caught by the worker and shown under Mail.
 - **Build pipeline in CI:** build bundles for each supported Joomla version on release.
 - **UI:** a simple toolbar (version picker, reset, export, open admin).
+  - **Done (2026-10-22)** (REPORT §17): PHP version picker, Start over; Export and Site/Administrator were
+    already there. A Joomla version picker waits for bundles of more versions.
 
 ## Phase 3: ecosystem (later)
 

@@ -322,6 +322,42 @@ describe('Blueprints', () => {
     await tab.close();
   });
 
+  test('switches PHP versions and starts over', async () => {
+    const tab = await context.newPage();
+
+    tab.on('dialog', (dialog) => dialog.accept());
+    await tab.goto(`${appUrl}?url=/index.php`);
+
+    const first = await waitForPlayground(tab);
+
+    assert.equal(first.phpVersion, '8.4');
+    assert.equal(await tab.inputValue('#php-version'), '8.4');
+
+    // PHP 8.5: a new playground from the same link.
+    await tab.selectOption('#php-version', '8.5');
+
+    const second = await waitForPlayground(tab, first.siteUrl);
+
+    assert.equal(second.phpVersion, '8.5');
+    assert.match(tab.url(), /php=8\.5/);
+    const site = await tab.evaluate(async (siteUrl) => {
+      const response = await fetch(`${siteUrl}/index.php`);
+
+      return { status: response.status, html: await response.text() };
+    }, second.siteUrl);
+
+    assert.equal(site.status, 200, 'Joomla runs on PHP 8.5');
+    assert.doesNotMatch(site.html, /Fatal error|Deprecated:|Warning:/);
+
+    await tab.click('#reset-site');
+
+    const third = await waitForPlayground(tab, second.siteUrl);
+
+    assert.equal(third.phpVersion, '8.5');
+    assert.notEqual(third.siteUrl, second.siteUrl);
+    await tab.close();
+  });
+
   test('reports a wrong blueprint', async () => {
     const tab = await context.newPage();
 

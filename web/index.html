@@ -63,7 +63,16 @@
 
     #status { color: var(--accent); }
     #status.error { color: var(--error); white-space: pre-wrap; }
-    #info, #credentials-label { color: var(--muted); }
+    #info, #credentials-label, #php-label { color: var(--muted); }
+
+    #php-version {
+      padding: 2px 4px;
+      border: 1px solid var(--muted);
+      border-radius: 4px;
+      background: var(--bar);
+      color: var(--bar-text);
+      font: inherit;
+    }
     #credentials { font-family: ui-monospace, Consolas, monospace; }
     .spacer { flex: 1; }
 
@@ -183,6 +192,7 @@
     <button id="open-admin" type="button" disabled>Administrator</button>
     <span class="separator"></span>
     <button id="new-site" type="button" disabled title="Start a new, empty playground">New</button>
+    <button id="reset-site" type="button" disabled title="Throw this playground away and start again from the same link">Start over</button>
     <button id="save-site" type="button" disabled title="Keep this playground in your browser">Save…</button>
     <button id="export-site" type="button" disabled title="Download the whole site as a zip">Export</button>
     <button id="import-site" type="button" disabled title="Start a playground from an exported zip">Import…</button>
@@ -195,6 +205,7 @@
     <span id="status">Loading</span>
     <span class="spacer"></span>
     <span><span id="credentials-label">Super User:</span> <span id="credentials">…</span></span>
+    <label id="php-label">PHP <select id="php-version" disabled title="PHP version (WebAssembly)"></select></label>
     <span id="info"></span>
   </header>
   <iframe id="joomla" title="Joomla"></iframe>
