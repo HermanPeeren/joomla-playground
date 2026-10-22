@@ -3,27 +3,49 @@
 // It puts a Joomla site into PHP's in-memory filesystem, points it at this tab's scope URL, sets the Super User
 // password, logs in, and answers the requests the service worker sends for that scope. The site comes from:
 // - the pre-installed bundle (joomla/site.zip, see bin/build-browser-bundle.php): a temporary playground;
-// - a saved site in the browser's private file system (OPFS), kept in sync after every request;
+// - a saved site in the browser's private file system (OPFS): the zip it started from plus a snapshot of the files
+//   that changed since, rewritten shortly after requests that change files (see storage.js);
 // - an imported zip (an export of a playground).
 //
 // The page talks to it with messages { type, id, ... }; the worker answers { type: 'result', id, value | error }
 // and sends { type: 'progress', message } while it works.
 
 import { PHP, PHPRequestHandler } from '@php-wasm/universal';
-import { createDirectoryHandleMountHandler, loadWebRuntime } from '@php-wasm/web';
-import { filesDirectory, readMeta, siteLockName, writeMeta } from './storage.js';
+import { loadWebRuntime } from '@php-wasm/web';
+import { journalFSEvents } from '@php-wasm/fs-journal';
+import { hasBase, readBase, readMeta, readSnapshot, siteLockName, writeBase, writeMeta, writeSnapshot } from './storage.js';
 
 const DOCUMENT_ROOT = '/var/www/html';
 const PHP_VERSION = '8.4';
 
+/** Caches, logs and temporary files: left out of exports and snapshots (a PHP regular expression). */
+const SKIP = '#^(tmp|cache|administrator/cache|administrator/logs)/(?!index\\.html$)#';
+
+/**
+ * After a form submission (any method but GET and HEAD) that changed files, a snapshot is written before the next
+ * request runs. After other requests (sessions, caches) it is written this long after the last one that changed
+ * files, and at most this long after the first.
+ */
+const SNAPSHOT_DELAY = 500;
+const SNAPSHOT_MAX_DELAY = 5000;
+
 const channel = new BroadcastChannel('joomla-playground');
 
-/** @type {{php: PHP, handler: PHPRequestHandler, manifest: object, password: string, site: string|null}} */
+/**
+ * base:    the zip the site started from; its bytes are kept until the site is saved
+ * changes: paths below the document root that changed since the site was unpacked from its base, and the folders
+ *          that were renamed (moved with all their files)
+ * dirty:   whether files changed since the last snapshot
+ *
+ * @type {{php: PHP, handler: PHPRequestHandler, manifest: object, password: string, site: string|null,
+ *   base: {id: string|null, bytes: Uint8Array|null}, changes: {paths: Set<string>, trees: Set<string>}, dirty: boolean}}
+ */
 let state = null;
 
 /**
  * Runs PHP requests one after the other. With a single PHP instance, @php-wasm rejects a request that arrives
- * while another one runs (SinglePHPInstanceManager), and pages fire several AJAX requests at once.
+ * while another one runs (SinglePHPInstanceManager), and pages fire several AJAX requests at once. Snapshots run
+ * in this queue too, so no request changes files while one is taken.
  */
 let queue = Promise.resolve();
 
@@ -34,7 +56,7 @@ function serialized(task) {
   return run;
 }
 
-const actions = { boot, save, exportSite };
+const actions = { boot, save, exportSite, flush };
 
 self.onmessage = async ({ data }) => {
   const action = actions[data?.type];
@@ -74,46 +96,45 @@ async function boot({ base, scope, site = null, title = null, zip = null }) {
   }
 
   progress(`Loading PHP ${PHP_VERSION}`);
-  const [php, manifest] = await Promise.all([
-    loadWebRuntime(PHP_VERSION).then((runtime) => new PHP(runtime)),
-    fetch(new URL('joomla/manifest.json', base)).then((response) => response.json()),
-  ]);
-  lap('php');
-
   const meta = site ? await readMeta(site) : null;
-  let password;
+  const [php, manifest, files] = await Promise.all([
+    loadWebRuntime(PHP_VERSION).then((runtime) => (lap('php'), new PHP(runtime))),
+    fetch(new URL('joomla/manifest.json', base)).then((response) => response.json()),
+    siteFiles({ base, site, meta, zip }).then((files) => (lap(meta ? 'read' : 'download'), files)),
+  ]);
 
-  if (meta) {
-    // A saved site: copy it from OPFS into memory; changes go back to OPFS after every request.
-    progress('Opening the saved site');
-    await php.mount(DOCUMENT_ROOT, createDirectoryHandleMountHandler(await filesDirectory(site), {
-      initialSync: { direction: 'opfs-to-memfs' },
-    }));
-    password = meta.password;
+  progress(meta ? 'Opening the saved site' : 'Unpacking Joomla');
+  php.mkdir(DOCUMENT_ROOT);
+  php.writeFile('/tmp/site.zip', files.bytes);
+  await runPhp(php, `
+    $zip = new ZipArchive();
+    if ($zip->open('/tmp/site.zip') !== true || !$zip->extractTo('${DOCUMENT_ROOT}')) {
+        throw new RuntimeException('Cannot unpack the site');
+    }
+    // An export says which Joomla version and driver it holds (see exportSite()).
+    file_put_contents('/tmp/archive-comment.json', (string) $zip->getArchiveComment());
+    $zip->close();
+    unlink('/tmp/site.zip');
+    if (!is_file('${DOCUMENT_ROOT}/configuration.php') || !is_file('${DOCUMENT_ROOT}/data/joomla.sqlite')) {
+        throw new RuntimeException('This zip is not a Joomla Playground export');
+    }
+  `);
+  lap('unpack');
+
+  const changes = { paths: new Set(), trees: new Set() };
+
+  if (files.snapshot) {
+    for (const path of await restoreSnapshot(php, files.snapshot)) {
+      changes.paths.add(path);
+    }
+
     lap('restore');
-  } else {
-    const bytes = zip ? new Uint8Array(zip) : await download(new URL('joomla/site.zip', base));
-    lap('download');
-
-    progress('Unpacking Joomla');
-    php.mkdir(DOCUMENT_ROOT);
-    php.writeFile('/tmp/site.zip', bytes);
-    await runPhp(php, `
-      $zip = new ZipArchive();
-      if ($zip->open('/tmp/site.zip') !== true || !$zip->extractTo('${DOCUMENT_ROOT}')) {
-          throw new RuntimeException('Cannot unpack the site');
-      }
-      // An export says which Joomla version and driver it holds (see exportSite()).
-      file_put_contents('/tmp/archive-comment.json', (string) $zip->getArchiveComment());
-      $zip->close();
-      unlink('/tmp/site.zip');
-      if (!is_file('${DOCUMENT_ROOT}/configuration.php') || !is_file('${DOCUMENT_ROOT}/data/joomla.sqlite')) {
-          throw new RuntimeException('This zip is not a Joomla Playground export');
-      }
-    `);
-    password = randomPassword();
-    lap('unpack');
   }
+
+  // From here on, note every path below the document root that changes: those go into the snapshots.
+  journalFSEvents(php, DOCUMENT_ROOT, (entry) => trackChange(changes, entry));
+
+  const password = meta?.password ?? randomPassword();
 
   progress('Configuring the site');
   php.writeFile('/tmp/playground.json', JSON.stringify({ siteUrl, password, root: DOCUMENT_ROOT }));
@@ -153,7 +174,16 @@ async function boot({ base, scope, site = null, title = null, zip = null }) {
         : { type: 'internal-redirect', uri: '/index.php' },
   });
 
-  state = { php, handler, manifest, password, site: null };
+  state = {
+    php,
+    handler,
+    manifest,
+    password,
+    site: null,
+    base: { id: meta?.base ?? null, bytes: meta ? null : files.bytes },
+    changes,
+    dirty: false,
+  };
 
   if (site && !meta) {
     await persist(site, title ?? site);
@@ -165,6 +195,7 @@ async function boot({ base, scope, site = null, title = null, zip = null }) {
   progress('Logging in');
   await logIn(handler, siteUrl, password);
   lap('login');
+  scheduleSnapshot();
 
   channel.onmessage = ({ data }) => {
     if (data?.type === 'request' && data.scope === scope) {
@@ -187,7 +218,29 @@ async function boot({ base, scope, site = null, title = null, zip = null }) {
 }
 
 /**
- * Saves the running playground as a site in OPFS. From then on, changes are written there after every request.
+ * The zip to start from (the bundle, an imported export, or a saved site's base), and a saved site's snapshot.
+ */
+async function siteFiles({ base, site, meta, zip }) {
+  if (!meta) {
+    return { bytes: zip ? new Uint8Array(zip) : await download(new URL('joomla/site.zip', base)), snapshot: null };
+  }
+
+  if (!meta.base) {
+    throw new Error(`The site "${site}" was saved by an earlier version of the playground and cannot be opened`);
+  }
+
+  const [bytes, snapshot] = await Promise.all([readBase(meta.base), readSnapshot(site)]);
+
+  if (!bytes) {
+    throw new Error(`The files of the site "${site}" are missing in this browser`);
+  }
+
+  return { bytes, snapshot };
+}
+
+/**
+ * Saves the running playground as a site in OPFS. From then on, a snapshot of its changes is written there shortly
+ * after requests that change files.
  */
 async function save({ site, title }) {
   if (!state) {
@@ -204,22 +257,212 @@ async function save({ site, title }) {
   return { value: { site } };
 }
 
+/**
+ * Writes the base (once per zip), a first snapshot and then meta.json: a site is listed only when it is complete.
+ */
 async function persist(site, title) {
   progress('Saving the site in this browser');
-  await state.php.mount(DOCUMENT_ROOT, createDirectoryHandleMountHandler(await filesDirectory(site), {
-    initialSync: {
-      direction: 'memfs-to-opfs',
-      onProgress: ({ files, total }) => total && progress(`Saving the site in this browser: ${files} of ${total} files`),
-    },
-  }));
+
+  const id = await sha256(state.base.bytes);
+
+  if (!(await hasBase(id))) {
+    await writeBase(id, state.base.bytes);
+  }
+
+  await snapshot(site);
   await writeMeta(site, {
     title,
     password: state.password,
     joomla: state.manifest.joomla,
     driver: state.manifest.driver,
+    base: id,
     created: new Date().toISOString(),
   });
+  state.base = { id, bytes: null };
   state.site = site;
+}
+
+/**
+ * Notes a filesystem operation of PHP (see journalFSEvents()) as a changed path, relative to the document root.
+ */
+function trackChange(changes, { operation, path, toPath, nodeType }) {
+  const relative = (absolute) => (absolute?.startsWith(`${DOCUMENT_ROOT}/`) ? absolute.slice(DOCUMENT_ROOT.length + 1) : null);
+  const from = relative(path);
+  const to = operation === 'RENAME' ? relative(toPath) : null;
+
+  if (from) {
+    changes.paths.add(from);
+  }
+
+  if (to) {
+    changes.paths.add(to);
+
+    if (nodeType === 'directory') {
+      changes.trees.add(to);
+    }
+  }
+
+  if (state && (from || to)) {
+    state.dirty = true;
+  }
+}
+
+let snapshotTimer = null;
+let firstChange = 0;
+
+/**
+ * Writes a snapshot of a saved site: next in the request queue, or after a quiet moment but not later than
+ * SNAPSHOT_MAX_DELAY after the first change, so a busy site is saved too.
+ */
+function scheduleSnapshot({ now: immediately = false } = {}) {
+  if (!state?.site || !state.dirty) {
+    return;
+  }
+
+  const now = performance.now();
+
+  if (snapshotTimer) {
+    clearTimeout(snapshotTimer);
+  } else {
+    firstChange = now;
+  }
+
+  if (immediately) {
+    snapshotTimer = null;
+    serialized(() => state.dirty && snapshot(state.site)).catch((error) => console.error('Cannot save the site:', error));
+
+    return;
+  }
+
+  snapshotTimer = setTimeout(() => {
+    snapshotTimer = null;
+    serialized(() => state.dirty && snapshot(state.site)).catch((error) => console.error('Cannot save the site:', error));
+  }, Math.max(0, Math.min(SNAPSHOT_DELAY, firstChange + SNAPSHOT_MAX_DELAY - now)));
+}
+
+/**
+ * The page is hidden or closing: write the pending snapshot now.
+ */
+async function flush() {
+  if (state?.site) {
+    clearTimeout(snapshotTimer);
+    snapshotTimer = null;
+    await serialized(() => state.dirty && snapshot(state.site));
+  }
+
+  return { value: null };
+}
+
+/**
+ * Zips the changed files (files/<path>) and the deleted paths (deleted.json), and writes the zip to OPFS.
+ * Runs in the request queue: no request changes files meanwhile.
+ */
+async function snapshot(site) {
+  const started = performance.now();
+
+  state.dirty = false;
+
+  try {
+    state.php.writeFile('/tmp/changes.json', JSON.stringify({ paths: [...state.changes.paths], trees: [...state.changes.trees] }));
+    await runPhp(state.php, `
+      $root    = '${DOCUMENT_ROOT}';
+      $changes = json_decode(file_get_contents('/tmp/changes.json'), true);
+      unlink('/tmp/changes.json');
+      $zip = new ZipArchive();
+      $zip->open('/tmp/snapshot.zip', ZipArchive::CREATE | ZipArchive::OVERWRITE);
+      $deleted = [];
+      $add = function (string $relative) use ($root, $zip, &$deleted) {
+          if (preg_match(${JSON.stringify(SKIP)}, $relative)) {
+              return;
+          }
+          $path = $root . '/' . $relative;
+          if (is_file($path)) {
+              $zip->addFile($path, 'files/' . $relative);
+          } elseif (is_dir($path)) {
+              $zip->addEmptyDir('files/' . $relative);
+          } else {
+              $deleted[] = $relative;
+          }
+      };
+      foreach ($changes['paths'] as $relative) {
+          $add($relative);
+      }
+      foreach ($changes['trees'] as $tree) {
+          if (is_dir($root . '/' . $tree)) {
+              $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root . '/' . $tree, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::SELF_FIRST);
+              foreach ($files as $file) {
+                  $add(substr($file->getPathname(), strlen($root) + 1));
+              }
+          }
+      }
+      $zip->addFromString('deleted.json', json_encode($deleted));
+      $zip->close();
+    `);
+
+    const bytes = state.php.readFileAsBuffer('/tmp/snapshot.zip');
+
+    state.php.unlink('/tmp/snapshot.zip');
+    await writeSnapshot(site, bytes);
+    console.debug(`Snapshot of "${site}": ${bytes.length} bytes in ${Math.round(performance.now() - started)} ms`);
+  } catch (error) {
+    state.dirty = true;
+
+    throw error;
+  }
+}
+
+/**
+ * Puts a snapshot on top of the unpacked base: removes the deleted paths, writes the changed files.
+ *
+ * @returns {Promise<string[]>} The paths in the snapshot: the changes of the site so far.
+ */
+async function restoreSnapshot(php, bytes) {
+  php.writeFile('/tmp/snapshot.zip', bytes);
+
+  const response = await runPhp(php, `
+    $root = '${DOCUMENT_ROOT}';
+    $zip  = new ZipArchive();
+    if ($zip->open('/tmp/snapshot.zip') !== true) {
+        throw new RuntimeException('Cannot open the snapshot of the site');
+    }
+    $remove = function (string $path) use (&$remove) {
+        if (is_dir($path) && !is_link($path)) {
+            foreach (array_diff(scandir($path), ['.', '..']) as $name) {
+                $remove($path . '/' . $name);
+            }
+            rmdir($path);
+        } elseif (file_exists($path) || is_link($path)) {
+            unlink($path);
+        }
+    };
+    $paths = json_decode((string) $zip->getFromName('deleted.json'), true) ?: [];
+    foreach ($paths as $relative) {
+        $remove($root . '/' . $relative);
+    }
+    for ($index = 0; $index < $zip->numFiles; $index++) {
+        $name = $zip->getNameIndex($index);
+        if (!str_starts_with($name, 'files/')) {
+            continue;
+        }
+        $relative = rtrim(substr($name, 6), '/');
+        $path     = $root . '/' . $relative;
+        $paths[]  = $relative;
+        if (str_ends_with($name, '/')) {
+            is_dir($path) || mkdir($path, 0777, true);
+            continue;
+        }
+        if (is_dir($path)) {
+            $remove($path);
+        }
+        is_dir(dirname($path)) || mkdir(dirname($path), 0777, true);
+        file_put_contents($path, $zip->getFromIndex($index));
+    }
+    $zip->close();
+    unlink('/tmp/snapshot.zip');
+    echo json_encode($paths);
+  `);
+
+  return JSON.parse(response.text);
 }
 
 /**
@@ -235,7 +478,7 @@ async function exportSite() {
   await serialized(() =>
     runPhp(state.php, `
       $root = '${DOCUMENT_ROOT}';
-      $skip = '#^(tmp|cache|administrator/cache|administrator/logs)/(?!index\\.html$)#';
+      $skip = ${JSON.stringify(SKIP)};
       $zip  = new ZipArchive();
       $zip->open('/tmp/export.zip', ZipArchive::CREATE | ZipArchive::OVERWRITE);
       $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS));
@@ -318,6 +561,8 @@ async function answer({ id, request }) {
       headers: { 'content-type': ['text/plain; charset=utf-8'] },
       body: new TextEncoder().encode(String(error?.stack ?? error)),
     });
+  } finally {
+    scheduleSnapshot({ now: !['GET', 'HEAD'].includes(String(request.method ?? 'GET').toUpperCase()) });
   }
 }
 
@@ -329,6 +574,12 @@ async function runPhp(php, code) {
   }
 
   return response;
+}
+
+async function sha256(bytes) {
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+
+  return Array.from(hash, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 async function download(url) {

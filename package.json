@@ -15,6 +15,7 @@
     "test:browser": "node --test --test-timeout=600000 tests/browser/playground.test.mjs"
   },
   "devDependencies": {
+    "@php-wasm/fs-journal": "3.1.60",
     "@php-wasm/node": "3.1.60",
     "@php-wasm/universal": "3.1.60",
     "@php-wasm/web": "3.1.60",

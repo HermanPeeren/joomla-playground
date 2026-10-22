@@ -161,7 +161,10 @@ pitch to the Joomla production department.
 - **Persistence:** save to OPFS ("My playgrounds"), export and import as a zip.
   - **Done (2026-10-22)** (REPORT §13): Save…, reopen with `?site=`, My sites, Export, Import, New; one tab
     per saved site.
-  - Next: faster saving and reopening (one zip instead of ~8,600 files in OPFS), and renaming.
+  - **Done:** faster saving and reopening. A saved site is its starting zip plus a snapshot of the changed
+    files, instead of ~8,600 files in OPFS. Saving takes 0.3 s instead of 13 s; reopening takes 3.0–4.7 s
+    instead of 7.6 s, 1–2 s more than a new playground.
+  - Next: renaming a saved site.
 - **Query API:**
   - `?joomla=6.2|5.4|nightly&php=8.3|8.4|8.5&language=nl-NL&login=yes`
   - `?extension=<url to zip>`

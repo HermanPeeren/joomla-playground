@@ -227,6 +227,12 @@ async function start() {
   elements.importFile.onchange = () => elements.importFile.files[0] && importSite(elements.importFile.files[0]);
   elements.sitesMenu.ontoggle = () => elements.sitesMenu.open && renderSites();
 
+  // A saved site writes its changes shortly after requests; when the tab is hidden or closed, write them now.
+  const flush = () => playground?.site && call('flush').catch(() => {});
+
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flush());
+  addEventListener('pagehide', flush);
+
   const site = new URLSearchParams(location.search).get('site');
 
   await boot(site ? { site } : {});
