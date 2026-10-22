@@ -1,6 +1,6 @@
 # Joomla Playground — draft build plan
 
-*Starting point for discussion. Builds on [REPORT.md](REPORT.md). Status 2026-10-22: phase 1 steps 1a (Joomla on SQLite), 1b (MySQL emulated on SQLite) and 2 (Joomla in `@php-wasm/node`) done; next is step 3, Joomla in the browser.*
+*Starting point for discussion. Builds on [REPORT.md](REPORT.md). Status 2026-10-22: phase 1 steps 1a (Joomla on SQLite), 1b (MySQL emulated on SQLite), 2 (Joomla in `@php-wasm/node`) and 3 (Joomla in the browser, first version) done; next are a public deployment and the MVP (phase 2).*
 
 ## Goal
 
@@ -27,7 +27,7 @@ runtime (`@php-wasm/*`) instead of rebuilding it.
 
 ## Phase 0: decisions and setup (½ day)
 
-- Repository name and location (e.g. `joomla-playground` under your GitHub account first, perhaps
+- Repository name and location (e.g. `joomla-playground` under a personal GitHub account first, perhaps
   `joomla-projects` later).
 - Tooling:
   - Node LTS + TypeScript + Vite for the web part.
@@ -124,6 +124,18 @@ unchanged.
 
 ### Step 3: Joomla in the browser · *3–5 days*
 
+**Done, first version (2026-10-22)** (REPORT §12).
+- **What works:** `web/` runs Joomla in a browser tab. It is ready about 2 s after the page loads (locally) and
+  logs in automatically. Each tab gets its own scope.
+- **Build:** `bin/build-browser-bundle.php` builds the pre-installed bundle.
+- **Tests:** browser tests in headless Chrome, which also run in CI.
+- **Still open from the list below:**
+  - deployment (the GitHub Pages workflow is ready);
+  - Firefox and Safari;
+  - `php -w` and vendor stripping;
+  - `cookie_path`, which the worker's cookie store makes unnecessary for now.
+
+
 - Build script, version 1:
   - Full Package → remove `installation/` → strip `*.gz` and extra languages → `php -w` → split `media/`
     into a static folder → `joomla-6.2.zip` plus `assets/`.
@@ -179,7 +191,7 @@ pitch to the Joomla production department.
 - **Documentation and outreach:** docs site, Joomla Magazine article, JoomlaDay talk, and maybe a GSoC 2027
   project idea (e.g. blueprints or PR previews).
 
-## Open questions for you
+## Open questions
 
 1. Personal or community project from the start? Should we contact the Joomla production department or
    maintainers (and/or the TYPO3 Playground people at Macopedia) early?

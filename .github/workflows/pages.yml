@@ -1,0 +1,64 @@
+name: Deploy the playground
+
+# Publishes web/dist to GitHub Pages. Pages must be enabled with "GitHub Actions" as source
+# (Settings > Pages) before this workflow can deploy.
+on:
+  workflow_dispatch:
+
+env:
+  JOOMLA_VERSION: 6.2.0
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, sqlite3, curl, zip, gd, intl, mbstring
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Download the Joomla package
+        run: |
+          file=".cache/Joomla_${JOOMLA_VERSION}-Stable-Full_Package.zip"
+          mkdir -p .cache && curl -sSfL -o "$file" "https://github.com/joomla/joomla-cms/releases/download/${JOOMLA_VERSION}/$(basename "$file")"
+
+      - run: composer install --no-interaction --no-progress
+      - run: npm ci --no-audit --no-fund
+
+      - name: Build the Joomla bundle and the playground
+        run: |
+          npm run bundle
+          npm run web:build
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

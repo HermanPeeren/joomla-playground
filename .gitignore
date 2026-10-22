@@ -8,3 +8,5 @@ cypress.env.json
 .phpunit.result.cache
 # PDFs of the docs are generated locally only (npm run docs:pdf)
 /docs/*.pdf
+/web/public/joomla/
+/web/dist/

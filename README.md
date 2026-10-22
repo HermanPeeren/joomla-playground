@@ -3,9 +3,8 @@
 Joomla running entirely in the browser, comparable to [WordPress Playground](https://wordpress.org/playground/):
 PHP compiled to WebAssembly, no server, no account, a disposable site in a browser tab.
 
-**Status: proof of concept, steps 1a, 1b and 2.** Joomla 6.2 runs on SQLite with either of two database
-drivers, with native PHP and with PHP compiled to WebAssembly (`@php-wasm/node`, in Node). The browser part does
-not exist yet. See the [exploration report](docs/REPORT.md) and the [plan](docs/PLAN.md).
+**Status: proof of concept, steps 1a–3.** Joomla 6.2 runs on SQLite (two database drivers), with native PHP,
+with PHP in WebAssembly in Node, and **in the browser**. See the [exploration report](docs/REPORT.md) and the [plan](docs/PLAN.md).
 
 ## Why SQLite first
 
@@ -32,6 +31,8 @@ See [REPORT §10](docs/REPORT.md) for the comparison.
 | [`src/Schema/PostgresqlToSqliteConverter.php`](src/Schema/PostgresqlToSqliteConverter.php) | Converts Joomla's PostgreSQL install SQL to SQLite |
 | [`overlay/`](overlay) | Files copied into the site: `defines.php` hooks that register the autoloader |
 | [`extensions/plg_system_playground`](extensions/plg_system_playground) | System plugin; for now it makes Global Configuration offer the playground database driver |
+| [`web/`](web) | The browser playground: page, PHP worker, service worker (`@php-wasm/web`, Vite) |
+| [`bin/build-browser-bundle.php`](bin/build-browser-bundle.php) | Builds the pre-installed Joomla bundle for the browser |
 | [`wasm/`](wasm) | Serves a site and runs its CLI with PHP in WebAssembly (`@php-wasm/node`) |
 | [`bin/install-sqlite-site.php`](bin/install-sqlite-site.php) | Installs a Joomla Full Package on SQLite, using Joomla's own installation models |
 
@@ -77,6 +78,32 @@ npm run wasm:cli -- --site=joomla -- user:list
 The runner mounts the site folder into PHP's virtual filesystem at `/var/www/html`. It also updates `live_site`,
 `tmp_path` and `log_path` in `configuration.php` to match.
 
+## In the browser
+
+```bash
+composer install
+```
+
+```bash
+npm install
+```
+
+```bash
+npm run bundle
+```
+
+```bash
+npm run web:dev
+```
+
+Then open http://localhost:5400/.
+- `npm run bundle` installs a Joomla site and packs it for the browser (`web/public/joomla/`).
+- `npm run web:dev` serves the playground.
+- The page starts PHP in a Web Worker and unpacks Joomla into memory. It then opens the administrator, already
+  logged in; the toolbar shows the Super User's password.
+- Service workers need `localhost` or HTTPS.
+- `npm run web:build` writes a static site to `web/dist/`, which any static web server can host.
+
 ## Tests
 
 ```bash
@@ -96,7 +123,9 @@ composer test
   - the scheduler and the CLI.
 
   `JOOMLA_TEST_DRIVER` (`mysqlonsqlite`, the default, or `playgroundsqlite`) chooses the database driver.
-  `JOOMLA_TEST_RUNTIME` (`native` or `wasm`) chooses whether PHP runs natively or in WebAssembly. The site is
+  `JOOMLA_TEST_RUNTIME` (`native` or `wasm`) chooses whether PHP runs natively or in WebAssembly.
+- **Browser tests** (`tests/browser`, `npm run test:browser`) run the built playground (`npm run bundle && npm
+  run web:build`) in headless Chrome. The site is
   installed from the release set by `JOOMLA_VERSION` in `phpunit.xml.dist`, downloaded once into
   `.cache/`.
 

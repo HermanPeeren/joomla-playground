@@ -14,6 +14,21 @@ export const DOCUMENT_ROOT = '/var/www/html';
 const processIds = new ProcessIdAllocator();
 
 /**
+ * Runs PHP requests one after the other. With a single PHP instance, @php-wasm rejects a request that arrives
+ * while another one runs (SinglePHPInstanceManager), and browsers send several requests at once.
+ */
+function createQueue() {
+  let queue = Promise.resolve();
+
+  return (task) => {
+    const run = queue.then(task, task);
+    queue = run.catch(() => {});
+
+    return run;
+  };
+}
+
+/**
  * Boots PHP with the site mounted.
  *
  * @param {object} options
@@ -77,6 +92,8 @@ export async function serve({ site, port = 8790, phpVersion = '8.4', log = () =>
         : { type: 'internal-redirect', uri: '/index.php' },
   });
 
+  const serialized = createQueue();
+
   const server = http.createServer(async (request, response) => {
     const started = performance.now();
 
@@ -91,12 +108,14 @@ export async function serve({ site, port = 8790, phpVersion = '8.4', log = () =>
         Object.entries(request.headers).map(([name, value]) => [name, Array.isArray(value) ? value.join(', ') : value])
       );
       const body = Buffer.concat(chunks);
-      const phpResponse = await handler.request({
-        url: request.url,
-        method: request.method,
-        headers,
-        body: body.length ? new Uint8Array(body) : undefined,
-      });
+      const phpResponse = await serialized(() =>
+        handler.request({
+          url: request.url,
+          method: request.method,
+          headers,
+          body: body.length ? new Uint8Array(body) : undefined,
+        })
+      );
 
       response.statusCode = phpResponse.httpStatusCode;
 
