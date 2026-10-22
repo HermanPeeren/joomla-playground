@@ -46,6 +46,10 @@ jobs:
         run: |
           npm run bundle
           npm run web:build
+        env:
+          # The deployed CORS proxy, if any (Settings > Secrets and variables > Actions > Variables), as a URL
+          # prefix, e.g. https://joomla-playground-cors-proxy.<account>.workers.dev/?url=
+          VITE_CORS_PROXY: ${{ vars.CORS_PROXY }}
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

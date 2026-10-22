@@ -1,0 +1,17 @@
+# Cloudflare Worker: the CORS proxy of the Joomla Playground (see cors-proxy.js and docs/DEVELOPMENT.md).
+name = "joomla-playground-cors-proxy"
+main = "cors-proxy.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Origins that may use the proxy; "*" allows any.
+ALLOWED_ORIGINS = "https://hermanpeeren.github.io,http://localhost:5400"
+
+# 60 requests per minute per client IP.
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 60
+  period = 60

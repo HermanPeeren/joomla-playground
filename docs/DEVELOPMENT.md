@@ -29,6 +29,7 @@ See [REPORT §10](REPORT.md) for the comparison.
 | [`src/Schema/PostgresqlToSqliteConverter.php`](../src/Schema/PostgresqlToSqliteConverter.php) | Converts Joomla's PostgreSQL install SQL to SQLite |
 | [`overlay/`](../overlay) | Files copied into the site: `defines.php` hooks that register the autoloader |
 | [`extensions/plg_system_playground`](../extensions/plg_system_playground) | System plugin; for now it makes Global Configuration offer the playground database driver |
+| [`proxy/`](../proxy) | CORS proxy for downloads, as a Cloudflare Worker |
 | [`wasm/`](../wasm) | Serves a site and runs its CLI with PHP in WebAssembly (`@php-wasm/node`) |
 | [`bin/install-sqlite-site.php`](../bin/install-sqlite-site.php) | Installs a Joomla Full Package on SQLite, using Joomla's own installation models |
 
@@ -65,6 +66,25 @@ Then open http://localhost:5400/.
   as a URL prefix to which the encoded download URL is appended, e.g. `https://proxy.example.org/?url=`.
 - Blueprints: `web/src/blueprint.js` reads them from the URL, `web/src/blueprint-steps.js` runs the steps in
   the PHP worker.
+
+## The CORS proxy
+
+Browsers only download from hosts that send CORS headers. Joomla's downloads and GitHub release assets do not,
+so blueprints can fall back to a small proxy: [`proxy/cors-proxy.js`](../proxy/cors-proxy.js), a Cloudflare
+Worker.
+- Only GET and HEAD, only https, only allowed hosts (downloads/update/extensions.joomla.org, GitHub and its
+  download hosts), also after redirects, which it follows itself; at most 50 MB.
+- `ALLOWED_ORIGINS` limits which sites may use it; a rate limiting binding limits requests per IP.
+- Tests with a fake upstream: `npm run test:proxy`.
+
+To deploy it (needs a Cloudflare account):
+
+```bash
+cd proxy && npx wrangler deploy
+```
+
+Then set the repository variable `CORS_PROXY` to `https://<worker host>/?url=`; the Pages workflow builds the
+playground with it (`VITE_CORS_PROXY`).
 
 ## Joomla on SQLite with native PHP
 

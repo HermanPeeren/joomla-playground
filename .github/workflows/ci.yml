@@ -94,6 +94,9 @@ jobs:
       - run: composer install --no-interaction --no-progress
       - run: npm ci --no-audit --no-fund
 
+      - name: CORS proxy tests
+        run: npm run test:proxy
+
       - name: Build the Joomla bundle and the playground
         run: |
           npm run bundle
