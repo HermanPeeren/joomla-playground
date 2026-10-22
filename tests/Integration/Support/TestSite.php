@@ -3,7 +3,11 @@
 namespace JoomlaPlayground\Tests\Integration\Support;
 
 /**
- * A freshly installed Joomla site on SQLite, served by PHP's built-in web server, shared by all integration tests.
+ * A freshly installed Joomla site on SQLite, shared by all integration tests.
+ *
+ * JOOMLA_TEST_RUNTIME chooses how it runs: 'native' (default) serves it with PHP's built-in web server and runs
+ * the CLI with this PHP; 'wasm' serves it and runs the CLI with PHP compiled to WebAssembly (wasm/serve.mjs and
+ * wasm/cli.mjs, on @php-wasm/node).
  *
  * The Full Package of JOOMLA_VERSION is downloaded once into .cache/, unpacked into build/test-site and
  * installed with bin/install-sqlite-site.php and a random Super User password, using the database driver in
@@ -24,6 +28,7 @@ final class TestSite
         public readonly string $username,
         public readonly string $password,
         public readonly string $driver,
+        public readonly string $runtime,
     ) {
     }
 
@@ -38,6 +43,7 @@ final class TestSite
         $version = getenv('JOOMLA_VERSION') ?: throw new \RuntimeException('JOOMLA_VERSION is not set');
         $port    = (int) (getenv('JOOMLA_TEST_PORT') ?: 8781);
         $driver  = getenv('JOOMLA_TEST_DRIVER') ?: 'playgroundsqlite';
+        $runtime = getenv('JOOMLA_TEST_RUNTIME') ?: 'native';
         $root    = $project . '/build/test-site';
         $url     = 'http://127.0.0.1:' . $port;
 
@@ -68,10 +74,18 @@ final class TestSite
             throw new \RuntimeException("Installing the test site failed:\n" . $output);
         }
 
-        $site = new self($root, $url, 'admin', $password, $driver);
+        $site = new self($root, $url, 'admin', $password, $driver, $runtime);
         $site->startServer($port);
 
         return $site;
+    }
+
+    /**
+     * A path inside the site as PHP sees it: on the host, or in the WebAssembly runtime's virtual filesystem.
+     */
+    public function sitePath(string $relativePath): string
+    {
+        return ($this->runtime === 'wasm' ? '/var/www/html' : $this->root) . '/' . ltrim($relativePath, '/');
     }
 
     public function pdo(): \PDO
@@ -90,6 +104,10 @@ final class TestSite
      */
     public function cli(string ...$arguments): array
     {
+        if ($this->runtime === 'wasm') {
+            return self::run(['node', \dirname(__DIR__, 3) . '/wasm/cli.mjs', '--site=' . $this->root, '--', ...$arguments]);
+        }
+
         return self::run([PHP_BINARY, '-d', 'xdebug.mode=off', $this->root . '/cli/joomla.php', ...$arguments], $this->root);
     }
 
@@ -109,8 +127,12 @@ final class TestSite
     {
         $log = $this->root . '/../php-server.log';
 
+        $command = $this->runtime === 'wasm'
+            ? ['node', \dirname(__DIR__, 3) . '/wasm/serve.mjs', '--site=' . $this->root, '--port=' . $port]
+            : [PHP_BINARY, '-d', 'xdebug.mode=off', '-S', '127.0.0.1:' . $port, '-t', $this->root];
+
         $this->server = proc_open(
-            [PHP_BINARY, '-d', 'xdebug.mode=off', '-S', '127.0.0.1:' . $port, '-t', $this->root],
+            $command,
             [0 => ['pipe', 'r'], 1 => ['file', $log, 'a'], 2 => ['file', $log, 'a']],
             $pipes,
             $this->root
@@ -122,7 +144,8 @@ final class TestSite
             }
         });
 
-        for ($attempt = 0; $attempt < 50; $attempt++) {
+        // Loading PHP's WebAssembly binary takes a few seconds.
+        for ($attempt = 0; $attempt < 300; $attempt++) {
             $socket = @fsockopen('127.0.0.1', $port, $errno, $error, 0.2);
 
             if ($socket) {

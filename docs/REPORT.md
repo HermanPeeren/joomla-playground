@@ -36,6 +36,9 @@ already been done by the WordPress Playground team and can be reused.
 - **Update, 2026-10-22: step 1b is done.** Joomla also runs on WordPress's MySQL emulation for SQLite (Option C),
   with Joomla's MySQL SQL unchanged. Third-party MySQL-only extension SQL works there, and comparisons follow
   MySQL. It is slower and needed workarounds for 6 emulator gaps. See §10.
+- **Update, 2026-10-22: step 2 is done.** Joomla runs in WebAssembly (`@php-wasm/node`) with both drivers, and
+  the full test suite passes there. WebAssembly costs 5–8× natively; the MySQL emulation adds 1.2–1.5× on top.
+  See §11.
 
 ## 2. How WordPress Playground works, and what is reusable
 
@@ -195,7 +198,7 @@ natively first, then move it into php-wasm.
 | **Single-threaded requests** | The lazy scheduler (on by default, 300 s) and the `update.notification` task can block the UI for up to 20 s. Disable them in the snapshot. |
 | **Mail** | Set `mailonline=0`, or capture `mail()` into an in-app inbox as WordPress does. |
 | **Not usable in the browser** | `com_joomlaupdate` (self-update), public-folder symlinks, the stats plugin. Disable or hide them in the snapshot. |
-| **32-bit WASM integers** | `PHP_INT_SIZE` is 4 on wasm32. Watch date math past 2038, big IDs and `mktime` (TYPO3 hit this). |
+| **32-bit WASM integers** | ~~`PHP_INT_SIZE` is 4 on wasm32.~~ Not an issue: step 2 measured `PHP_INT_SIZE` = 8 in `@php-wasm` 3.1.60 (§11). |
 | **Performance** | Expect 5–15 s boot and a sluggish admin on mobile. Fine for demos, trials and PR previews, not for daily development (Automattic's Studio moved to native PHP for that reason). |
 | **Persistence** | Browser storage can be evicted. Offer export/import (zip) early. |
 | **Extensions with MySQL-only SQL** | Under Option A they install without tables. Mitigate with a system plugin that translates MySQL install SQL on install, or by choosing Option C. |
@@ -406,7 +409,64 @@ All of these are covered by tests:
 - If that overhead is acceptable, make C the default and keep A as the fast fallback.
 - Report the gaps to WordPress/sqlite-database-integration.
 
-## 11. Sources
+## 11. Step 2 result: Joomla in WebAssembly, in Node (2026-10-22)
+
+Joomla 6.2.0 runs on PHP 8.4 compiled to WebAssembly (`@php-wasm/node` 3.1.60, the runtime WordPress Playground
+uses) with **both** database drivers. There are no Joomla core changes, and no changes to `@php-wasm`.
+
+**How it runs** (`wasm/joomla-wasm.mjs`)
+- The site folder is mounted into PHP's virtual filesystem at `/var/www/html` (NODEFS).
+- `PHPRequestHandler` serves it behind a plain Node HTTP server (`npm run wasm:serve -- --site=…`).
+- Unknown site paths go to `index.php` (SEF URLs), as Joomla's `.htaccess` does.
+- The browser keeps the cookies.
+- The Joomla CLI runs through `php.cli()` (`npm run wasm:cli -- --site=… -- user:list`).
+- The runner points `tmp_path`, `log_path` and `live_site` in `configuration.php` at the virtual filesystem and
+  the served URL.
+
+**Tests:** all 73 integration tests pass in WebAssembly with both drivers (`JOOMLA_TEST_RUNTIME=wasm`), the CLI
+tests included. CI runs WebAssembly jobs next to the native ones.
+
+**What the plan asked to check**
+
+| Check | Result |
+|---|---|
+| PHP extensions | pdo_sqlite (SQLite **3.51**), gd, zip, mbstring, openssl, dom, simplexml, curl, fileinfo, … are present. `intl` is opt-in (`withIntl`); `sodium` is missing, but Joomla ships `sodium_compat`. |
+| 32-bit integers | Not an issue: `PHP_INT_SIZE` is **8**. |
+| `SCRIPT_NAME` / `REQUEST_URI` / SEF URLs | Work. `PHP_SAPI` is `wasm`, not `cli`, so Joomla finds its URLs **even without `live_site`** (checked), unlike with `php -S`. |
+| Sessions and cookies | Work (logins, CSRF tokens, the whole admin suite). |
+| Uploads / install from folder | Work (extension install from a folder in the virtual filesystem). |
+| CLI | Works: `user:list`, `extension:list`, `finder:index`, `scheduler:run`. |
+| Node version | `@php-wasm/node` declares Node ≥ 24.18, but runs on Node 20 with the Asyncify build. CI uses Node 24. One option has to be passed: `processId`. |
+
+**Speed.** Same site and machine, median of 6 warm requests. A = `playgroundsqlite`, C = `mysqlonsqlite`.
+
+| Page | native A | native C | wasm A | wasm C |
+|---|---|---|---|---|
+| Site home | 40 ms | 58 ms | 306 ms | 376 ms |
+| Site category | 57 ms | 112 ms | 326 ms | 504 ms |
+| Admin dashboard | 59 ms | 110 ms | 501 ms | 727 ms |
+| Admin articles | 70 ms | 130 ms | 370 ms | 565 ms |
+| Admin menu items | 70 ms | 171 ms | 410 ms | 589 ms |
+| Admin extensions | 388 ms | 504 ms | 521 ms | 627 ms |
+
+- WebAssembly itself costs 5–8× (Asyncify build, files read from the host through NODEFS). The first request
+  takes about 2 s (warm-up).
+- **In WebAssembly the MySQL emulation adds only 1.2–1.5×**, against up to 2.6× natively. PHP execution
+  dominates, so the emulator's share shrinks.
+- OPcache is switched on in the ini, but `opcache_get_status()` does not report it as active. If every request
+  recompiles Joomla's code, that is the biggest lever for speed. Worth investigating in step 3, together with
+  JSPI builds.
+
+**Driver decision (from step 1b).** C's overhead under WebAssembly is moderate: 70–230 ms per page on top of
+300–500 ms. That makes C the recommended default for the playground:
+- MySQL semantics;
+- third-party MySQL install SQL works;
+- no schema maintenance per Joomla release.
+
+A stays available as the fast fallback. This recommendation still needs your go-ahead before the installer
+default changes.
+
+## 12. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)

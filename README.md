@@ -3,8 +3,9 @@
 Joomla running entirely in the browser, comparable to [WordPress Playground](https://wordpress.org/playground/):
 PHP compiled to WebAssembly, no server, no account, a disposable site in a browser tab.
 
-**Status: proof of concept, steps 1a and 1b.** Joomla 6.2 runs on SQLite with native PHP, with either of two
-database drivers. The browser part does not exist yet. See the [exploration report](docs/REPORT.md) and the [plan](docs/PLAN.md).
+**Status: proof of concept, steps 1a, 1b and 2.** Joomla 6.2 runs on SQLite with either of two database
+drivers, with native PHP and with PHP compiled to WebAssembly (`@php-wasm/node`, in Node). The browser part does
+not exist yet. See the [exploration report](docs/REPORT.md) and the [plan](docs/PLAN.md).
 
 ## Why SQLite first
 
@@ -31,6 +32,7 @@ See [REPORT §10](docs/REPORT.md) for the comparison.
 | [`src/Schema/PostgresqlToSqliteConverter.php`](src/Schema/PostgresqlToSqliteConverter.php) | Converts Joomla's PostgreSQL install SQL to SQLite |
 | [`overlay/`](overlay) | Files copied into the site: `defines.php` hooks that register the autoloader |
 | [`extensions/plg_system_playground`](extensions/plg_system_playground) | System plugin; for now it makes Global Configuration offer the playground database driver |
+| [`wasm/`](wasm) | Serves a site and runs its CLI with PHP in WebAssembly (`@php-wasm/node`) |
 | [`bin/install-sqlite-site.php`](bin/install-sqlite-site.php) | Installs a Joomla Full Package on SQLite, using Joomla's own installation models |
 
 ## Try it
@@ -53,6 +55,26 @@ php -S 127.0.0.1:8080 -t joomla
 Then open http://127.0.0.1:8080/administrator/. Joomla treats PHP's built-in web server (`cli-server`) as
 CLI and cannot work out its base URL, which is why `--live-site` is needed with `php -S`.
 
+### In WebAssembly
+
+The same installed site can be served by PHP 8.4 compiled to WebAssembly, the runtime of WordPress Playground.
+This needs Node.js (24 recommended).
+
+```bash
+npm install
+```
+
+```bash
+npm run wasm:serve -- --site=joomla --port=8090
+```
+
+```bash
+npm run wasm:cli -- --site=joomla -- user:list
+```
+
+The runner mounts the site folder into PHP's virtual filesystem at `/var/www/html`. It also updates `live_site`,
+`tmp_path` and `log_path` in `configuration.php` to match.
+
 ## Tests
 
 ```bash
@@ -71,7 +93,8 @@ composer test
   - Global Configuration;
   - the scheduler and the CLI.
 
-  `JOOMLA_TEST_DRIVER` (`playgroundsqlite` or `mysqlonsqlite`) chooses the database driver. The site is
+  `JOOMLA_TEST_DRIVER` (`playgroundsqlite` or `mysqlonsqlite`) chooses the database driver.
+  `JOOMLA_TEST_RUNTIME` (`native` or `wasm`) chooses whether PHP runs natively or in WebAssembly. The site is
   installed from the release set by `JOOMLA_VERSION` in `phpunit.xml.dist`, downloaded once into
   `.cache/`.
 
