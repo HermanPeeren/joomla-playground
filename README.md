@@ -18,7 +18,8 @@ The toolbar above the site:
 | **Site** / **Administrator** | Show the front end or the administrator of the site. |
 | **New** | Start a new, empty playground. |
 | **Save…** | Keep this playground in your browser under a name. From then on, changes are saved as you work. |
-| **My sites** | Open or delete the sites you saved. |
+| **My sites** | Open, rename or delete the sites you saved. |
+| **Mail** | The mails the site sent. They are caught here, not delivered: try a password reset or a contact form. |
 | **Export** | Download the whole site as a zip. |
 | **Import…** | Start a playground from such a zip, e.g. one someone sent you. |
 
@@ -35,8 +36,9 @@ as a logged-in user. Hover over the Joomla version for timings.
 
 **Good to know**
 - Use a recent Chrome, Edge or other Chromium browser; Firefox and Safari are not tested yet.
-- The site cannot reach the internet yet: installing extensions or languages from within Joomla, update checks
-  and sending mail do not work. A link or blueprint can install extensions (see below).
+- The site cannot reach the internet yet: installing extensions or languages from within Joomla and update
+  checks do not work. A link or blueprint can install extensions (see below).
+- The Mail inbox keeps the mails until the page is reloaded.
 - Each tab is its own playground, with its own site and database.
 - Clearing your browser's site data for this address deletes the saved sites.
 

@@ -7,11 +7,13 @@ import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, statSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
-const port = Number(process.env.PLAYGROUND_TEST_PORT ?? 5402);
+// A free port unless PLAYGROUND_TEST_PORT says otherwise: a fixed port could reach the server of another checkout.
+const port = Number(process.env.PLAYGROUND_TEST_PORT ?? (await freePort()));
 const appUrl = `http://localhost:${port}/`;
 
 let server;
@@ -88,6 +90,34 @@ describe('Joomla Playground in the browser', () => {
     assert.ok(stylesheet.href.startsWith(`${playground.siteUrl}/media/`), stylesheet.href);
     assert.equal(stylesheet.status, 200);
     assert.match(stylesheet.type, /text\/css/);
+  });
+
+  test('catches the mail Joomla sends and shows it under Mail', async () => {
+    // Global Configuration's "Send Test Mail", as its button does it: JSON with the mail settings and the form token.
+    const answer = await page.evaluate(async (siteUrl) => {
+      const administrator = await (await fetch(`${siteUrl}/administrator/index.php?option=com_config`)).text();
+      const token = administrator.match(/"csrf\.token":"([a-f0-9]{32})"/)[1];
+      const response = await fetch(`${siteUrl}/administrator/index.php?option=com_config&task=application.sendtestmail&format=json&${token}=1`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-csrf-token': token },
+        body: JSON.stringify({ mailonline: 1, mailer: 'sendmail', mailfrom: 'site@example.invalid', fromname: 'Joomla Playground', sendmail: '/usr/sbin/sendmail', smtpauth: 0, smtpuser: '', smtphost: 'localhost', smtpsecure: 'none', smtpport: 25 }),
+      });
+
+      return response.text();
+    }, playground.siteUrl);
+
+    assert.match(answer, /"data":true/, answer.slice(0, 500));
+
+    await page.waitForFunction(() => document.querySelector('#mail-count').textContent === '1', null, { timeout: 10000 });
+    await page.click('#mail');
+    await page.waitForSelector('#mail-list li.selected, #mail-list li:not(.empty)');
+
+    const headers = await page.locator('#mail-headers').textContent();
+
+    assert.match(headers, /site@example\.invalid/);
+    assert.match(headers, /Test mail|test mail/i);
+    assert.ok((await page.locator('#mail-view').textContent()).length > 50 || (await page.locator('#mail-html').count()) === 1, 'The mail has a body');
+    await page.click('#mail-dialog button[type="submit"]');
   });
 
   test('saves an article through the administrator form', async () => {
@@ -174,9 +204,15 @@ describe('Joomla Playground in the browser', () => {
     assert.ok(await siteShows(page, playground, 'Written after saving'), 'The change after saving survived the reload');
   });
 
-  test('lists the saved site under My sites', async () => {
+  test('lists the saved site under My sites, and renames it', async () => {
     await page.click('#sites-menu summary');
     await page.waitForSelector('#sites-list a:has-text("Persistence test")', { timeout: 10000 });
+
+    page.once('dialog', (dialog) => dialog.accept('Renamed test'));
+    await page.click('#sites-list li:has-text("Persistence test") button:has-text("Rename")');
+    await page.waitForSelector('#sites-list a:has-text("Renamed test")', { timeout: 10000 });
+
+    assert.equal(await page.getAttribute('#sites-list a:has-text("Renamed test")', 'href'), '?site=persistence-test');
     await page.click('#sites-menu summary');
   });
 
@@ -359,6 +395,10 @@ async function openInFrame(path) {
 
 async function waitForServer(url) {
   for (let attempt = 0; attempt < 100; attempt++) {
+    if (server.exitCode !== null) {
+      throw new Error(`The preview server stopped (exit code ${server.exitCode}); is port ${port} in use?`);
+    }
+
     try {
       const response = await fetch(url);
 
@@ -373,4 +413,17 @@ async function waitForServer(url) {
   }
 
   throw new Error(`${url} did not start`);
+}
+
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const probe = createServer();
+
+    probe.once('error', reject);
+    probe.listen(0, 'localhost', () => {
+      const { port: free } = probe.address();
+
+      probe.close(() => resolve(free));
+    });
+  });
 }

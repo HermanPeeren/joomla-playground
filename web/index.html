@@ -113,7 +113,61 @@
     #sites-list li.empty { display: block; color: #666; }
     #sites-list a { color: #1a5fb4; font-weight: 600; }
     #sites-list .details { grid-column: 1; font-size: 12px; color: #666; }
-    #sites-list button { grid-row: 1 / span 2; grid-column: 2; align-self: center; color: #a51d2d; border-color: #c6a0a6; }
+    #sites-list .actions { grid-row: 1 / span 2; grid-column: 2; align-self: center; display: flex; gap: 6px; }
+    #sites-list button { color: #1a5fb4; border-color: #a7bfdc; }
+    #sites-list button.delete { color: #a51d2d; border-color: #c6a0a6; }
+
+    #mail-count:not(:empty) {
+      margin-left: 4px;
+      padding: 0 6px;
+      border-radius: 8px;
+      background: var(--accent);
+      color: var(--bar);
+      font-weight: 600;
+    }
+
+    #mail-dialog {
+      width: min(1000px, calc(100vw - 32px));
+      height: min(700px, calc(100vh - 64px));
+      padding: 0;
+      border: 0;
+      border-radius: 8px;
+      box-shadow: 0 12px 48px rgba(0, 0, 0, 0.35);
+      color: #1a1a1a;
+      background: var(--page);
+    }
+
+    #mail-dialog[open] { display: grid; grid-template-rows: auto 1fr; }
+    #mail-dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
+
+    #mail-dialog header { justify-content: space-between; }
+    #mail-dialog .body { display: grid; grid-template-columns: minmax(200px, 1fr) 2fr; min-height: 0; }
+
+    #mail-list {
+      margin: 0;
+      padding: 0;
+      overflow: auto;
+      list-style: none;
+      border-right: 1px solid #ddd;
+    }
+
+    #mail-list li { padding: 8px 12px; border-bottom: 1px solid #eee; cursor: pointer; }
+    #mail-list li.selected { background: #e8f0fb; }
+    #mail-list li.empty { color: #666; cursor: default; }
+    #mail-list .subject { font-weight: 600; }
+    #mail-list .meta { font-size: 12px; color: #666; }
+
+    #mail-view { display: grid; grid-template-rows: auto 1fr; min-height: 0; }
+    #mail-headers { margin: 0; padding: 8px 12px; font-size: 13px; border-bottom: 1px solid #eee; }
+    #mail-headers dt { float: left; clear: left; width: 64px; color: #666; }
+    #mail-headers dd { margin-left: 72px; }
+    #mail-text { margin: 0; padding: 12px; overflow: auto; white-space: pre-wrap; font: 13px ui-monospace, Consolas, monospace; }
+    #mail-html { width: 100%; height: 100%; border: 0; }
+
+    @media (max-width: 640px) {
+      #mail-dialog .body { grid-template-columns: 1fr; grid-template-rows: 40% 1fr; }
+      #mail-list { border-right: 0; border-bottom: 1px solid #ddd; }
+    }
 
     iframe {
       flex: 1;
@@ -137,12 +191,26 @@
       <summary>My sites</summary>
       <ul id="sites-list"></ul>
     </details>
+    <button id="mail" type="button" disabled title="The mails this site sent: they are caught, not delivered">Mail<span id="mail-count"></span></button>
     <span id="status">Loading</span>
     <span class="spacer"></span>
     <span><span id="credentials-label">Super User:</span> <span id="credentials">…</span></span>
     <span id="info"></span>
   </header>
   <iframe id="joomla" title="Joomla"></iframe>
+  <dialog id="mail-dialog">
+    <header>
+      <h1>Mail sent by this playground</h1>
+      <form method="dialog"><button type="submit">Close</button></form>
+    </header>
+    <div class="body">
+      <ul id="mail-list"></ul>
+      <div id="mail-view">
+        <dl id="mail-headers"></dl>
+        <pre id="mail-text"></pre>
+      </div>
+    </div>
+  </dialog>
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>
