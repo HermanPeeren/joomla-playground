@@ -1,7 +1,7 @@
 // Browser tests of the Joomla Playground: the production build (web/dist) in headless Chrome.
 //
 // Needs: npm run bundle && npm run web:build, and Google Chrome (or CHROME_PATH).
-// Run:   npm run test:browser
+// Run:   npm run test:browser (node --test with the file named: Node 22+ does not take a folder)
 
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
