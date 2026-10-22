@@ -6,6 +6,9 @@ PHP compiled to WebAssembly, no server, no account, a disposable site in a brows
 **Status: proof of concept, steps 1a–3.** Joomla 6.2 runs on SQLite (two database drivers), with native PHP,
 with PHP in WebAssembly in Node, and **in the browser**. See the [exploration report](docs/REPORT.md) and the [plan](docs/PLAN.md).
 
+**Try it:** <https://hermanpeeren.github.io/joomla-playground/>. Joomla starts in your browser tab, logged in to the administrator. Nothing is stored:
+reloading the page gives a new site.
+
 ## Why SQLite first
 
 In the browser, PHP (php-wasm) has SQLite but no MySQL or PostgreSQL server. Joomla supports only MySQL and

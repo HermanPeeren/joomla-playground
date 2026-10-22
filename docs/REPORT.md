@@ -42,6 +42,7 @@ already been done by the WordPress Playground team and can be reused.
 - **Update, 2026-10-22: step 3 is done (first version).** Joomla runs in a browser tab: no server-side PHP, and
   it is ready about 2 s after the page loads (locally). The administrator is logged in automatically. The site,
   the administrator, forms, AJAX and static media work, and Chrome browser tests cover them. See §12.
+- **Public playground:** <https://hermanpeeren.github.io/joomla-playground/> (GitHub Pages). It is ready about 6 s after the page loads, downloads included.
 
 ## 2. How WordPress Playground works, and what is reusable
 
@@ -555,8 +556,10 @@ real Chrome does.
 - **Speed:** OPcache and JSPI.
 - **Smaller downloads:** strip `libraries/vendor`; `php -w`.
 - **Browser coverage:** Firefox and Safari are untested.
-- **A public URL:** a GitHub Pages workflow is ready (`.github/workflows/pages.yml`). It needs Pages enabled
-  with "GitHub Actions" as the source.
+- ~~A public URL~~ Done: <https://hermanpeeren.github.io/joomla-playground/>.
+  - It is published to GitHub Pages by `.github/workflows/pages.yml`, started by hand.
+  - In headless Chrome it was ready in 5.9 s, downloads included: PHP after 1.9 s, Joomla downloaded by 3.9 s,
+    logged in at 5.9 s.
 - **Blueprints and the query API.**
 
 ## 13. Sources

@@ -1,6 +1,6 @@
 # Joomla Playground — draft build plan
 
-*Starting point for discussion. Builds on [REPORT.md](REPORT.md). Status 2026-10-22: phase 1 steps 1a (Joomla on SQLite), 1b (MySQL emulated on SQLite), 2 (Joomla in `@php-wasm/node`) and 3 (Joomla in the browser, first version) done; next are a public deployment and the MVP (phase 2).*
+*Starting point for discussion. Builds on [REPORT.md](REPORT.md). Status 2026-10-22: phase 1 steps 1a (Joomla on SQLite), 1b (MySQL emulated on SQLite), 2 (Joomla in `@php-wasm/node`) and 3 (Joomla in the browser, first version) done, and the playground is public at <https://hermanpeeren.github.io/joomla-playground/>; next is the MVP (phase 2).*
 
 ## Goal
 
@@ -130,7 +130,7 @@ unchanged.
 - **Build:** `bin/build-browser-bundle.php` builds the pre-installed bundle.
 - **Tests:** browser tests in headless Chrome, which also run in CI.
 - **Still open from the list below:**
-  - deployment (the GitHub Pages workflow is ready);
+  - ~~deployment~~ done: <https://hermanpeeren.github.io/joomla-playground/>, published by the GitHub Pages workflow (started by hand);
   - Firefox and Safari;
   - `php -w` and vendor stripping;
   - `cookie_path`, which the worker's cookie store makes unnecessary for now.
