@@ -4,8 +4,9 @@
 // ?site=<slug> opens a site saved in this browser; without it, a new temporary playground starts, set up by the
 // blueprint in the URL if there is one (see blueprint.js).
 
-import { deleteSite, freeSlug, isSiteOpen, listSites } from './storage.js';
+import { deleteSite, freeSlug, isSiteOpen, listSites, renameSite } from './storage.js';
 import { blueprintFromUrl } from './blueprint.js';
+import { parseMail } from './mail.js';
 
 const base = new URL('./', location.href);
 
@@ -26,6 +27,12 @@ const elements = {
   sitesList: document.querySelector('#sites-list'),
   credentials: document.querySelector('#credentials'),
   info: document.querySelector('#info'),
+  mail: document.querySelector('#mail'),
+  mailCount: document.querySelector('#mail-count'),
+  mailDialog: document.querySelector('#mail-dialog'),
+  mailList: document.querySelector('#mail-list'),
+  mailHeaders: document.querySelector('#mail-headers'),
+  mailView: document.querySelector('#mail-view'),
 };
 
 let worker = null;
@@ -33,13 +40,17 @@ let playground = null;
 const pending = new Map();
 let nextId = 1;
 
+/** The mails the running playground sent, newest first. */
+let mails = [];
+let selectedMail = null;
+
 function setStatus(message, isError = false) {
   elements.status.textContent = message;
   elements.status.classList.toggle('error', isError);
 }
 
 function setBusy(busy) {
-  for (const button of [elements.site, elements.admin, elements.newSite, elements.save, elements.exportSite, elements.importSite]) {
+  for (const button of [elements.site, elements.admin, elements.newSite, elements.save, elements.exportSite, elements.importSite, elements.mail]) {
     button.disabled = busy;
   }
 
@@ -61,9 +72,15 @@ function call(type, payload = {}, transfer = []) {
 function startWorker() {
   worker?.terminate();
   worker = new Worker(new URL('./php-worker.js', import.meta.url), { type: 'module' });
+  mails = [];
+  selectedMail = null;
+  renderMails();
   worker.onmessage = ({ data }) => {
     if (data.type === 'progress') {
       setStatus(data.message);
+    } else if (data.type === 'mail') {
+      mails.unshift({ ...parseMail(data.mail.raw), received: data.mail.received });
+      renderMails();
     } else if (data.type === 'result' && pending.has(data.id)) {
       const { resolve, reject } = pending.get(data.id);
 
@@ -198,7 +215,18 @@ async function renderSites() {
       className: 'details',
       textContent: `Joomla ${site.joomla} · ${new Date(site.updated).toLocaleString()}`,
     });
-    const remove = Object.assign(document.createElement('button'), { type: 'button', textContent: 'Delete' });
+    const actions = Object.assign(document.createElement('span'), { className: 'actions' });
+    const rename = Object.assign(document.createElement('button'), { type: 'button', textContent: 'Rename' });
+    const remove = Object.assign(document.createElement('button'), { type: 'button', className: 'delete', textContent: 'Delete' });
+
+    rename.onclick = async () => {
+      const title = prompt('New name for this site:', site.title)?.trim();
+
+      if (title && title !== site.title) {
+        await renameSite(site.slug, title);
+        await renderSites();
+      }
+    };
 
     remove.onclick = async () => {
       if (await isSiteOpen(site.slug)) {
@@ -213,9 +241,59 @@ async function renderSites() {
       }
     };
 
-    item.append(open, details, remove);
+    actions.append(rename, remove);
+    item.append(open, details, actions);
     elements.sitesList.append(item);
   }
+}
+
+/**
+ * The Mail button shows how many mails were sent; its dialog lists them and shows the selected one.
+ */
+function renderMails() {
+  elements.mailCount.textContent = mails.length ? String(mails.length) : '';
+
+  if (!elements.mailDialog.open) {
+    return;
+  }
+
+  elements.mailList.replaceChildren();
+
+  if (mails.length === 0) {
+    elements.mailList.append(Object.assign(document.createElement('li'), { className: 'empty', textContent: 'No mail yet. Mails the site sends show up here.' }));
+  }
+
+  for (const mail of mails) {
+    const item = document.createElement('li');
+
+    item.classList.toggle('selected', mail === selectedMail);
+    item.append(
+      Object.assign(document.createElement('div'), { className: 'subject', textContent: mail.subject }),
+      Object.assign(document.createElement('div'), { className: 'meta', textContent: `To ${mail.to} · ${new Date(mail.received).toLocaleTimeString()}` })
+    );
+    item.onclick = () => {
+      selectedMail = mail;
+      renderMails();
+    };
+    elements.mailList.append(item);
+  }
+
+  const mail = selectedMail ?? mails[0];
+  const headers = mail ? [['From', mail.from], ['To', mail.to], ['Subject', mail.subject], ['Date', mail.date]] : [];
+
+  elements.mailHeaders.replaceChildren(
+    ...headers.flatMap(([name, value]) => [
+      Object.assign(document.createElement('dt'), { textContent: name }),
+      Object.assign(document.createElement('dd'), { textContent: value }),
+    ])
+  );
+
+  // An HTML mail is shown in a sandboxed frame without scripts; a text mail as text.
+  const content = mail?.html
+    ? Object.assign(document.createElement('iframe'), { id: 'mail-html', title: 'Mail', sandbox: '', srcdoc: mail.html })
+    : Object.assign(document.createElement('pre'), { id: 'mail-text', textContent: mail?.text ?? '' });
+
+  elements.mailView.replaceChildren(elements.mailHeaders, content);
 }
 
 async function start() {
@@ -235,6 +313,10 @@ async function start() {
   elements.importSite.onclick = () => elements.importFile.click();
   elements.importFile.onchange = () => elements.importFile.files[0] && importSite(elements.importFile.files[0]);
   elements.sitesMenu.ontoggle = () => elements.sitesMenu.open && renderSites();
+  elements.mail.onclick = () => {
+    elements.mailDialog.showModal();
+    renderMails();
+  };
 
   // A saved site writes its changes shortly after requests; when the tab is hidden or closed, write them now.
   const flush = () => playground?.site && call('flush').catch(() => {});

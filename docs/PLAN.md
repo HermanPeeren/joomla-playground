@@ -164,7 +164,7 @@ pitch to the Joomla production department.
   - **Done:** faster saving and reopening. A saved site is its starting zip plus a snapshot of the changed
     files, instead of ~8,600 files in OPFS. Saving takes 0.3 s instead of 13 s; reopening takes 3.0–4.7 s
     instead of 7.6 s, 1–2 s more than a new playground.
-  - Next: renaming a saved site.
+  - **Done:** renaming a saved site (REPORT §15).
 - **Query API:**
   - `?joomla=6.2|5.4|nightly&php=8.3|8.4|8.5&language=nl-NL&login=yes`
   - `?extension=<url to zip>`
@@ -180,6 +180,7 @@ pitch to the Joomla production department.
 - **CORS proxy:** a Cloudflare Worker or the reusable `php-cors-proxy`, with an allow-list
   (downloads.joomla.org, update.joomla.org, GitHub releases, JED download hosts) and rate limits.
 - **Mail capture:** an in-app inbox showing the mails Joomla tries to send.
+  - **Done (2026-10-22)** (REPORT §15): PHP's sendmail is caught by the worker and shown under Mail.
 - **Build pipeline in CI:** build bundles for each supported Joomla version on release.
 - **UI:** a simple toolbar (version picker, reset, export, open admin).
 

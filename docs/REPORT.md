@@ -694,7 +694,25 @@ other steps on PHP 8.3 was ready in 12.8 s, of which the steps took 10.5 s.
 - a blueprint with all step types on PHP 8.3, logged out, landing on the front end;
 - a wrong blueprint gives an error.
 
-## 15. Sources
+## 15. Phase 2, part 3: mail capture and renaming (2026-10-22)
+
+- **Mail capture:** the mails a playground sends appear under **Mail** in the toolbar, with a count. A dialog
+  lists them and shows the selected one: headers, and the text, or the HTML in a sandboxed frame without
+  scripts.
+  - PHP sends mail by starting `sendmail` (PHP's `mail()`, and Joomla's mailer set to `sendmail`).
+    `@php-wasm/universal` lets the host handle a spawned program: `setCommandSpawnHandler('sendmail', …)`. The PHP
+    worker reads the message from its stdin and passes it to the page.
+  - At every boot, the worker sets `mailonline` to on and the mailer to `sendmail` in `configuration.php`, and
+    `sendmail_path` in `php.ini`.
+  - The page decodes the mail: multipart, quoted-printable, base64, encoded words in headers.
+  - The mails live in the page's memory only; a reload empties the inbox.
+- **Rename:** **My sites** has a Rename button per saved site. The title changes; the address (`?site=<slug>`)
+  stays.
+- **Tests** (13): Global Configuration's Send Test Mail shows up under Mail; renaming a saved site.
+- The browser tests now pick a free port. With a fixed port, a run could silently test the preview server of
+  another checkout.
+
+## 16. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)

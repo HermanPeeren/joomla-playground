@@ -11,9 +11,10 @@
 // The page talks to it with messages { type, id, ... }; the worker answers { type: 'result', id, value | error }
 // and sends { type: 'progress', message } while it works.
 
-import { PHP, PHPRequestHandler } from '@php-wasm/universal';
+import { PHP, PHPRequestHandler, setPhpIniEntries } from '@php-wasm/universal';
 import { loadWebRuntime } from '@php-wasm/web';
 import { journalFSEvents } from '@php-wasm/fs-journal';
+import { createSpawnHandler } from '@php-wasm/util';
 import { hasBase, readBase, readMeta, readSnapshot, siteLockName, writeBase, writeMeta, writeSnapshot } from './storage.js';
 import { DEFAULT_PHP_VERSION } from './blueprint.js';
 import { BlueprintError, runSteps } from './blueprint-steps.js';
@@ -149,6 +150,10 @@ async function boot({ base, scope, site = null, title = null, zip = null, php: p
 
   const password = meta?.password ?? randomPassword();
 
+  // Mail: PHP's mail() and Joomla's sendmail mailer start "sendmail"; the worker catches the message instead.
+  php.setCommandSpawnHandler('sendmail', createSpawnHandler(catchMail));
+  await setPhpIniEntries(php, { sendmail_path: '/usr/sbin/sendmail -t -i' });
+
   progress('Configuring the site');
   php.writeFile('/tmp/playground.json', JSON.stringify({ siteUrl, password, root: DOCUMENT_ROOT }));
   await runPhp(php, `
@@ -161,6 +166,10 @@ async function boot({ base, scope, site = null, title = null, zip = null, php: p
         'live_site' => $settings['siteUrl'],
         'tmp_path'  => $settings['root'] . '/tmp',
         'log_path'  => $settings['root'] . '/administrator/logs',
+        // Mails go to the playground's inbox (see catchMail()).
+        'mailonline' => true,
+        'mailer'     => 'sendmail',
+        'sendmail'   => '/usr/sbin/sendmail',
     ];
     $configuration = file_get_contents($file);
     foreach ($values as $key => $value) {
@@ -622,6 +631,32 @@ async function answer({ id, request }) {
   } finally {
     scheduleSnapshot({ now: !['GET', 'HEAD'].includes(String(request.method ?? 'GET').toUpperCase()) });
   }
+}
+
+/**
+ * Stands in for sendmail: reads the message from stdin and sends it to the page's inbox.
+ */
+async function catchMail(command, processApi) {
+  const chunks = [];
+
+  processApi.on('stdin', (data) => chunks.push(typeof data === 'string' ? new TextEncoder().encode(data) : new Uint8Array(data)));
+
+  const stdin = processApi.childProcess.stdin;
+
+  if (!(stdin.ended || stdin.writableEnded || stdin.writableFinished)) {
+    await new Promise((resolve) => stdin.once('finish', resolve));
+  }
+
+  const bytes = new Uint8Array(chunks.reduce((length, chunk) => length + chunk.length, 0));
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  self.postMessage({ type: 'mail', mail: { raw: new TextDecoder().decode(bytes), received: new Date().toISOString() } });
+  processApi.exit(0);
 }
 
 async function runPhp(php, code) {

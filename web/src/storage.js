@@ -138,6 +138,16 @@ export async function listSites() {
   return sites.sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
 }
 
+export async function renameSite(slug, title) {
+  const meta = await readMeta(slug);
+
+  if (!meta) {
+    throw new Error(`No saved site "${slug}"`);
+  }
+
+  await writeMeta(slug, { ...meta, title });
+}
+
 /**
  * Deletes a site, and the bases no other site uses. A base written in the last hour stays: another tab may be saving
  * a site from it that has no meta.json yet.
