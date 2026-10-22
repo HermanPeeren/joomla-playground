@@ -75,6 +75,7 @@ final class MysqlOnSqliteDriverTest extends TestCase
         $this->assertSame('a:b', $this->db->setQuery("SELECT CONCAT_WS(':', 'a', NULL, 'b')")->loadResult());
         $this->assertSame('R163', $this->db->setQuery("SELECT SOUNDEX('Robert')")->loadResult());
         $this->assertSame('', $this->db->getConnectionEncryption());
+        $this->assertSame('16777216', $this->db->setQuery('SHOW VARIABLES LIKE ' . $this->db->quote('max_heap_table_size'))->loadObject()->Value);
 
         $this->db->setQuery("INSERT INTO `#__items` (`title`, `created`) VALUES ('a', NOW()), ('b', NOW())")->execute();
         $query = $this->db->createQuery();

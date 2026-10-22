@@ -1,11 +1,16 @@
 // Main page of the Joomla Playground: registers the service worker, starts the PHP worker, shows Joomla in an
 // iframe and offers saving, exporting and importing playgrounds.
 //
-// ?site=<slug> opens a site saved in this browser; without it, a new temporary playground starts.
+// ?site=<slug> opens a site saved in this browser; without it, a new temporary playground starts, set up by the
+// blueprint in the URL if there is one (see blueprint.js).
 
 import { deleteSite, freeSlug, isSiteOpen, listSites } from './storage.js';
+import { blueprintFromUrl } from './blueprint.js';
 
 const base = new URL('./', location.href);
+
+// A CORS proxy for downloads of blueprints, set at build time: VITE_CORS_PROXY=https://proxy.example.org/?url=
+const corsProxy = import.meta.env.VITE_CORS_PROXY || null;
 
 const elements = {
   status: document.querySelector('#status'),
@@ -85,21 +90,25 @@ async function boot(options = {}, transfer = []) {
 
   const scope = `scope-${Math.random().toString(36).slice(2, 10)}`;
 
-  playground = await call('boot', { base: base.href, scope, ...options }, transfer);
-  show();
+  playground = await call('boot', { base: base.href, scope, corsProxy, ...options }, transfer);
+  show(playground.landingPage ?? '/administrator/');
+
+  if (playground.blueprintError) {
+    setStatus(playground.blueprintError, true);
+  }
 
   return playground;
 }
 
-function show() {
-  const seconds = (playground.timings.login / 1000).toFixed(1);
+function show(path = '/administrator/') {
+  const seconds = (playground.timings.ready / 1000).toFixed(1);
   const where = playground.site ? `saved as "${playground.site}"` : 'temporary';
 
   setStatus(`Ready in ${seconds} s (${where})`);
   elements.credentials.textContent = `${playground.username} / ${playground.password}`;
   elements.info.textContent = `Joomla ${playground.manifest.joomla} · PHP ${playground.phpVersion} (WebAssembly) · ${playground.manifest.driver}`;
   elements.info.title = Object.entries(playground.timings).map(([step, ms]) => `${step}: ${ms} ms`).join('\n');
-  elements.frame.src = new URL('administrator/', `${playground.siteUrl}/`).href;
+  elements.frame.src = `${playground.siteUrl}${path}`;
   setBusy(false);
 
   // For tests and debugging.
@@ -233,9 +242,11 @@ async function start() {
   document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flush());
   addEventListener('pagehide', flush);
 
-  const site = new URLSearchParams(location.search).get('site');
+  const url = new URL(location.href);
+  const site = url.searchParams.get('site');
+  const blueprint = await blueprintFromUrl(url);
 
-  await boot(site ? { site } : {});
+  await boot({ ...(site ? { site } : {}), php: blueprint?.preferredVersions?.php ?? null, blueprint });
 }
 
 start().catch((error) => {
