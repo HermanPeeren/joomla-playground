@@ -116,8 +116,8 @@ unchanged.
 - **Checks:** `PHP_SAPI` is `wasm`, so Joomla needs no `live_site`; integers are 64-bit; `intl` is opt-in and
   `sodium` is missing, which `sodium_compat` covers.
 - **Speed:** WebAssembly costs 5–8×. The MySQL emulation adds only 1.2–1.5× on top (REPORT §11).
-- **Recommendation:** make `mysqlonsqlite` the default driver and keep `playgroundsqlite` as the fast
-  fallback. Waiting for your go-ahead.
+- **Decided:** `mysqlonsqlite` is the default driver, and `playgroundsqlite` stays as the fast fallback
+  (`--driver=playgroundsqlite`).
 - **For step 3:**
   - Find out why OPcache does not report itself active, and try JSPI builds; both are speed levers.
   - Load the site into MEMFS instead of NODEFS.

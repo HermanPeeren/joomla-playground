@@ -11,7 +11,7 @@ namespace JoomlaPlayground\Tests\Integration\Support;
  *
  * The Full Package of JOOMLA_VERSION is downloaded once into .cache/, unpacked into build/test-site and
  * installed with bin/install-sqlite-site.php and a random Super User password, using the database driver in
- * JOOMLA_TEST_DRIVER (playgroundsqlite or mysqlonsqlite).
+ * JOOMLA_TEST_DRIVER (mysqlonsqlite, the default, or playgroundsqlite).
  */
 final class TestSite
 {
@@ -42,7 +42,7 @@ final class TestSite
         $project = \dirname(__DIR__, 3);
         $version = getenv('JOOMLA_VERSION') ?: throw new \RuntimeException('JOOMLA_VERSION is not set');
         $port    = (int) (getenv('JOOMLA_TEST_PORT') ?: 8781);
-        $driver  = getenv('JOOMLA_TEST_DRIVER') ?: 'playgroundsqlite';
+        $driver  = getenv('JOOMLA_TEST_DRIVER') ?: 'mysqlonsqlite';
         $runtime = getenv('JOOMLA_TEST_RUNTIME') ?: 'native';
         $root    = $project . '/build/test-site';
         $url     = 'http://127.0.0.1:' . $port;

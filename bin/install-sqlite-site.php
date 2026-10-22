@@ -11,8 +11,8 @@
  *
  * Options:
  *   --site=DIR              Joomla root, unpacked from a Full Package, still containing installation/ (required)
- *   --driver=DRIVER         playgroundsqlite (default): Joomla's PostgreSQL schema converted to SQLite;
- *                           mysqlonsqlite: Joomla's MySQL schema on WordPress's MySQL emulation for SQLite (spike)
+ *   --driver=DRIVER         mysqlonsqlite (default): Joomla's MySQL schema on WordPress's MySQL emulation for SQLite;
+ *                           playgroundsqlite: Joomla's PostgreSQL schema converted to SQLite (faster, PostgreSQL semantics)
  *   --db=PATH               SQLite database file, relative to the Joomla root (default: data/joomla.sqlite)
  *   --prefix=PREFIX         Table prefix (default: jos_)
  *   --site-name=NAME        Site name (default: Joomla Playground)
@@ -61,7 +61,7 @@ $drivers           = [
     'playgroundsqlite' => \JoomlaPlayground\Database\SqliteDriver::class,
     'mysqlonsqlite'    => \JoomlaPlayground\Database\MysqlOnSqlite\MysqlOnSqliteDriver::class,
 ];
-$driver            = $options['driver'] ?? 'playgroundsqlite';
+$driver            = $options['driver'] ?? 'mysqlonsqlite';
 
 if (!isset($drivers[$driver])) {
     fail('Unknown driver ' . $driver . '; use ' . implode(' or ', array_keys($drivers)));

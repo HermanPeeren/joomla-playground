@@ -463,8 +463,10 @@ tests included. CI runs WebAssembly jobs next to the native ones.
 - third-party MySQL install SQL works;
 - no schema maintenance per Joomla release.
 
-A stays available as the fast fallback. This recommendation still needs your go-ahead before the installer
-default changes.
+A stays available as the fast fallback.
+
+**Decided (2026-10-22):** `mysqlonsqlite` is now the installer's default driver; `--driver=playgroundsqlite`
+selects A.
 
 ## 12. Sources
 
