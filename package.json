@@ -1,0 +1,13 @@
+{
+  "name": "joomla-playground",
+  "private": true,
+  "description": "Joomla running in the browser via PHP-in-WebAssembly, comparable to WordPress Playground",
+  "license": "GPL-2.0-or-later",
+  "type": "module",
+  "scripts": {
+    "docs:pdf": "node scripts/build-docs.mjs"
+  },
+  "devDependencies": {
+    "marked": "18.1.1"
+  }
+}

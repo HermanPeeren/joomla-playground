@@ -1,0 +1,32 @@
+{
+    "name": "hermanpeeren/joomla-playground",
+    "description": "Joomla running in the browser via PHP-in-WebAssembly, comparable to WordPress Playground",
+    "type": "project",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": "^8.3",
+        "ext-pdo_sqlite": "*"
+    },
+    "require-dev": {
+        "joomla/database": "4.0.0",
+        "phpunit/phpunit": "^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "JoomlaPlayground\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "JoomlaPlayground\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "test:unit": "phpunit --testsuite unit",
+        "test:integration": "phpunit --testsuite integration"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

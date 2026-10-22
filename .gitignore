@@ -1,0 +1,10 @@
+/joomla/
+/.cache/
+/node_modules/
+/vendor/
+/build/
+cypress.env.json
+.phpunit.cache/
+.phpunit.result.cache
+# PDFs of the docs are generated locally only (npm run docs:pdf)
+/docs/*.pdf

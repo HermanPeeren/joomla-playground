@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  # Joomla release the integration tests install; keep in line with phpunit.xml.dist
+  JOOMLA_VERSION: 6.2.0
+
+jobs:
+  tests:
+    name: PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_sqlite, sqlite3, curl, zip, gd, intl, mbstring
+          coverage: none
+
+      - name: Cache the Joomla package
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: joomla-${{ env.JOOMLA_VERSION }}
+
+      - run: composer install --no-interaction --no-progress
+
+      - name: Unit tests
+        run: vendor/bin/phpunit --testsuite unit
+
+      - name: Integration tests (Joomla on SQLite)
+        run: vendor/bin/phpunit --testsuite integration
+
+      - name: PHP server log
+        if: failure()
+        run: cat build/php-server.log || true

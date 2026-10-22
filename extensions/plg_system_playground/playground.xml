@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<extension type="plugin" group="system" method="upgrade">
+	<name>plg_system_playground</name>
+	<author>Herman Peeren</author>
+	<creationDate>2026-10</creationDate>
+	<copyright>(C) 2026 Herman Peeren</copyright>
+	<license>GNU General Public License version 2 or later; see LICENSE.txt</license>
+	<version>0.1.0</version>
+	<description>PLG_SYSTEM_PLAYGROUND_XML_DESCRIPTION</description>
+	<namespace path="src">JoomlaPlayground\Plugin\System\Playground</namespace>
+	<files>
+		<folder plugin="playground">services</folder>
+		<folder>src</folder>
+	</files>
+	<languages>
+		<language tag="en-GB">language/en-GB/plg_system_playground.ini</language>
+		<language tag="en-GB">language/en-GB/plg_system_playground.sys.ini</language>
+	</languages>
+</extension>
