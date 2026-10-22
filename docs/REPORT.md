@@ -727,7 +727,19 @@ Worker that fetches such a file and returns it with CORS headers, like WordPress
 - **Not done:** deploying it needs a Cloudflare account; the rate limit configuration is untested. PHP's own
   outgoing requests (update checks, installing from within Joomla) do not use it yet.
 
-## 17. Sources
+## 17. Phase 2, part 5: the toolbar (2026-10-22)
+
+- **PHP version picker:** PHP 8.3, 8.4 or 8.5. A saved site reopens with the chosen version and keeps it. A
+  temporary playground starts again from the same link with `?php=<version>`, after a confirmation.
+- **Start over:** a temporary playground starts again from the same link, so a blueprint runs again.
+- **Found and fixed:** on PHP 8.5, `PDO::sqliteCreateFunction()` is deprecated. The `mysqlonsqlite` driver
+  registers its SQL functions with it on every connection, so every page started with deprecation notices. They
+  were sent before the headers, and the session could not start: the administrator showed no login form. The
+  driver now uses `Pdo\Sqlite::createFunction()` (PHP 8.4+) when the connection is a `Pdo\Sqlite`, as
+  `SqliteDriver` and the MySQL emulation already did.
+- **Tests** (14): switch from PHP 8.4 to 8.5, check that Joomla's front end answers without errors, start over.
+
+## 18. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)

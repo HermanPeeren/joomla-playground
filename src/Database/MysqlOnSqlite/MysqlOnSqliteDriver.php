@@ -79,10 +79,12 @@ class MysqlOnSqliteDriver extends MysqlDriver
 
         // MySQL functions the emulator does not provide (yet): TIME_FORMAT is in Joomla's install SQL; CONCAT_WS
         // (native only since SQLite 3.44) and SOUNDEX (Smart Search) are used when saving content.
-        $sqlite = $this->connection->get_sqlite_pdo();
-        $sqlite->sqliteCreateFunction('TIME_FORMAT', [SqliteFunctions::class, 'timeFormat'], 2);
-        $sqlite->sqliteCreateFunction('CONCAT_WS', [SqliteFunctions::class, 'concatWs'], -1);
-        $sqlite->sqliteCreateFunction('SOUNDEX', [SqliteFunctions::class, 'soundex'], 1);
+        // PHP 8.5 deprecates PDO::sqliteCreateFunction() in favour of Pdo\Sqlite::createFunction() (PHP 8.4+).
+        $sqlite   = $this->connection->get_sqlite_pdo();
+        $register = $sqlite instanceof \Pdo\Sqlite ? $sqlite->createFunction(...) : $sqlite->sqliteCreateFunction(...);
+        $register('TIME_FORMAT', [SqliteFunctions::class, 'timeFormat'], 2);
+        $register('CONCAT_WS', [SqliteFunctions::class, 'concatWs'], -1);
+        $register('SOUNDEX', [SqliteFunctions::class, 'soundex'], 1);
 
         $this->utf8mb4 = true;
         $this->mariadb = false;

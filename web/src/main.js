@@ -5,7 +5,7 @@
 // blueprint in the URL if there is one (see blueprint.js).
 
 import { deleteSite, freeSlug, isSiteOpen, listSites, renameSite } from './storage.js';
-import { blueprintFromUrl } from './blueprint.js';
+import { PHP_VERSIONS, blueprintFromUrl } from './blueprint.js';
 import { parseMail } from './mail.js';
 
 const base = new URL('./', location.href);
@@ -19,6 +19,8 @@ const elements = {
   site: document.querySelector('#open-site'),
   admin: document.querySelector('#open-admin'),
   newSite: document.querySelector('#new-site'),
+  reset: document.querySelector('#reset-site'),
+  php: document.querySelector('#php-version'),
   save: document.querySelector('#save-site'),
   exportSite: document.querySelector('#export-site'),
   importSite: document.querySelector('#import-site'),
@@ -50,9 +52,12 @@ function setStatus(message, isError = false) {
 }
 
 function setBusy(busy) {
-  for (const button of [elements.site, elements.admin, elements.newSite, elements.save, elements.exportSite, elements.importSite, elements.mail]) {
+  for (const button of [elements.site, elements.admin, elements.newSite, elements.save, elements.exportSite, elements.importSite, elements.mail, elements.php]) {
     button.disabled = busy;
   }
+
+  // A saved site keeps its changes; starting over is for temporary playgrounds.
+  elements.reset.disabled = busy || Boolean(playground?.site);
 
   elements.save.disabled = busy || Boolean(playground?.site);
 }
@@ -123,7 +128,8 @@ function show(path = '/administrator/') {
 
   setStatus(`Ready in ${seconds} s (${where})`);
   elements.credentials.textContent = `${playground.username} / ${playground.password}`;
-  elements.info.textContent = `Joomla ${playground.manifest.joomla} · PHP ${playground.phpVersion} (WebAssembly) · ${playground.manifest.driver}`;
+  elements.info.textContent = `Joomla ${playground.manifest.joomla} · ${playground.manifest.driver}`;
+  elements.php.value = playground.phpVersion;
   elements.info.title = Object.entries(playground.timings).map(([step, ms]) => `${step}: ${ms} ms`).join('\n');
   elements.frame.src = `${playground.siteUrl}${path}`;
   setBusy(false);
@@ -296,6 +302,30 @@ function renderMails() {
   elements.mailView.replaceChildren(elements.mailHeaders, content);
 }
 
+/**
+ * Another PHP version: a saved site reopens with it (and keeps it); a temporary playground starts again from the
+ * same link with it.
+ */
+function switchPhp() {
+  const version = elements.php.value;
+  const url = new URL(location.href);
+
+  if (!playground.site && !confirm(`Start a new playground with PHP ${version}? This one is not saved and will be lost.`)) {
+    elements.php.value = playground.phpVersion;
+
+    return;
+  }
+
+  url.searchParams.set('php', version);
+  location.href = url.href;
+}
+
+function startOver() {
+  if (confirm('Throw this playground away and start again from the same link?')) {
+    location.reload();
+  }
+}
+
 async function start() {
   if (!('serviceWorker' in navigator)) {
     throw new Error('This browser does not support service workers (they need HTTPS or localhost).');
@@ -308,6 +338,9 @@ async function start() {
   elements.site.onclick = () => (elements.frame.src = `${playground.siteUrl}/`);
   elements.admin.onclick = () => (elements.frame.src = `${playground.siteUrl}/administrator/`);
   elements.newSite.onclick = () => (location.href = base.pathname);
+  elements.reset.onclick = startOver;
+  elements.php.replaceChildren(...PHP_VERSIONS.map((version) => new Option(version, version)));
+  elements.php.onchange = switchPhp;
   elements.save.onclick = saveSite;
   elements.exportSite.onclick = exportSite;
   elements.importSite.onclick = () => elements.importFile.click();
@@ -329,6 +362,11 @@ async function start() {
   const blueprint = await blueprintFromUrl(url);
 
   await boot({ ...(site ? { site } : {}), php: blueprint?.preferredVersions?.php ?? null, blueprint });
+
+  // A saved site remembers its PHP version: its address needs no ?php any more.
+  if (site && url.searchParams.has('php')) {
+    history.replaceState(null, '', `?site=${encodeURIComponent(site)}`);
+  }
 }
 
 start().catch((error) => {

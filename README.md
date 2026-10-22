@@ -17,13 +17,15 @@ The toolbar above the site:
 |---|---|
 | **Site** / **Administrator** | Show the front end or the administrator of the site. |
 | **New** | Start a new, empty playground. |
+| **Start over** | Throw this playground away and start again from the same link (and blueprint). |
 | **Save…** | Keep this playground in your browser under a name. From then on, changes are saved as you work. |
 | **My sites** | Open, rename or delete the sites you saved. |
 | **Mail** | The mails the site sent. They are caught here, not delivered: try a password reset or a contact form. |
 | **Export** | Download the whole site as a zip. |
 | **Import…** | Start a playground from such a zip, e.g. one someone sent you. |
 
-On the right, the toolbar shows the Super User's name and password, in case you log out or want to see the site
+On the right, **PHP** switches the PHP version (8.3, 8.4 or 8.5): a saved site reopens with it, a temporary
+playground starts again from the same link. Next to it, the toolbar shows the Super User's name and password, in case you log out or want to see the site
 as a logged-in user. Hover over the Joomla version for timings.
 
 **Temporary or saved?**
