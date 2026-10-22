@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
 
-// @php-wasm/web can load every PHP version; the playground uses 8.4. The other versions point to a stub, so the
-// build does not ship their WebAssembly binaries.
-const otherPhpVersions = ['8-5', '8-3', '8-2', '8-1', '8-0', '7-4', '5-2'];
+// @php-wasm/web can load every PHP version; the playground offers those Joomla 6 supports (see blueprint.js).
+// The other versions point to a stub, so the build does not ship their WebAssembly binaries.
+const otherPhpVersions = ['8-2', '8-1', '8-0', '7-4', '5-2'];
 const stub = fileURLToPath(new URL('./src/php-version-stub.js', import.meta.url));
 
 export default defineConfig({
@@ -12,7 +12,7 @@ export default defineConfig({
   base: './',
   assetsInclude: [/\.dat$/, /\.so$/, /\.la$/],
   optimizeDeps: {
-    exclude: ['@php-wasm/web', '@php-wasm/web-8-4'],
+    exclude: ['@php-wasm/web', '@php-wasm/web-8-3', '@php-wasm/web-8-4', '@php-wasm/web-8-5'],
   },
   resolve: {
     alias: Object.fromEntries(otherPhpVersions.map((version) => [`@php-wasm/web-${version}`, stub])),

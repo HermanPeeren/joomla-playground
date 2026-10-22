@@ -35,10 +35,57 @@ as a logged-in user. Hover over the Joomla version for timings.
 
 **Good to know**
 - Use a recent Chrome, Edge or other Chromium browser; Firefox and Safari are not tested yet.
-- The site cannot reach the internet yet: installing extensions or languages from the web, update checks and
-  sending mail do not work.
+- The site cannot reach the internet yet: installing extensions or languages from within Joomla, update checks
+  and sending mail do not work. A link or blueprint can install extensions (see below).
 - Each tab is its own playground, with its own site and database.
 - Clearing your browser's site data for this address deletes the saved sites.
+
+## Setting up a playground with a link
+
+A link can say how a new playground should look. Add these to the address:
+
+| Parameter | Example | What it does |
+|---|---|---|
+| `php` | `?php=8.3` | PHP version: 8.3, 8.4 (default) or 8.5 |
+| `url` | `?url=/index.php` | The page to open first; default `/administrator/` |
+| `login` | `?login=no` | Start logged out |
+| `extension` | `?extension=https://example.org/mod_hello.zip` | Install an extension package (repeatable) |
+| `language` | `?language=nl-NL` | Make an installed language the site's default |
+| `blueprint-url` | `?blueprint-url=https://example.org/blueprint.json` | Set up the site with a blueprint |
+
+A **blueprint** is a small JSON file with the steps to set up a site. It can also be put in the address
+itself, after `#`. For example, this one installs Joomla's blog sample data, renames the site and opens the
+front end:
+
+```json
+{
+  "preferredVersions": { "php": "8.4" },
+  "landingPage": "/index.php",
+  "steps": [
+    { "step": "importSampleData" },
+    { "step": "setGlobalConfig", "values": { "sitename": "My demo" } }
+  ]
+}
+```
+
+The steps:
+
+| Step | Properties | What it does |
+|---|---|---|
+| `installExtension` | `url` | Install an extension package (zip) |
+| `enableExtension` | `element`, `type`, `folder`, `client` | Enable an extension, e.g. `{"element": "debug", "type": "plugin", "folder": "system"}` |
+| `importSampleData` | `type` (default `blog`) | Install Joomla's sample data |
+| `setGlobalConfig` | `values` | Set Global Configuration options (properties of `configuration.php`) |
+| `setSiteLanguage` | `language`, `administrator` | Make an installed language the default |
+| `runSql` | `sql` | Run SQL statements (MySQL syntax; `#__` is the table prefix) |
+| `runPHP` | `code` | Run PHP code in the site's root folder |
+| `writeFile` | `path`, `data` | Write a file into the site |
+| `unzip` | `url`, `to` | Unpack a zip into the site |
+| `login` | | Log in as the Super User (done by default) |
+
+Downloads (`extension`, `installExtension`, `unzip`) need a host that allows it (CORS headers), such as
+GitHub Pages or raw.githubusercontent.com; release downloads on GitHub do not. URLs in a blueprint are relative
+to the blueprint. If a step fails, the playground still starts and the toolbar shows the error.
 
 ## Running your own copy
 

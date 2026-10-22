@@ -169,10 +169,14 @@ pitch to the Joomla production department.
   - `?joomla=6.2|5.4|nightly&php=8.3|8.4|8.5&language=nl-NL&login=yes`
   - `?extension=<url to zip>`
   - `?url=/administrator/…` (landing page)
+  - **Done (2026-10-22)** (REPORT §14): `php`, `url`, `login`, `extension`, `language` (an installed language),
+    `blueprint-url`. Next: `joomla` needs bundles of more versions (see the build pipeline).
 - **Blueprint v0** (JSON in the URL fragment or `?blueprint-url=`). Steps:
   - `installExtension`, `enableExtension`, `login`, `setGlobalConfig`, `runPHP`, `runSql`, `writeFile`,
     `unzip`, `importSampleData`, `setSiteLanguage`.
   - Keep the schema close to WordPress Blueprints v2 where it makes sense.
+  - **Done (2026-10-22)** (REPORT §14): all ten steps, in the shape of WordPress's Blueprints v1
+    (`preferredVersions`, `landingPage`, `login`, `steps`).
 - **CORS proxy:** a Cloudflare Worker or the reusable `php-cors-proxy`, with an allow-list
   (downloads.joomla.org, update.joomla.org, GitHub releases, JED download hosts) and rate limits.
 - **Mail capture:** an in-app inbox showing the mails Joomla tries to send.

@@ -5,8 +5,8 @@
 
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { existsSync, statSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { existsSync, mkdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 
@@ -22,6 +22,18 @@ let playground;
 describe('Joomla Playground in the browser', () => {
   before(async () => {
     assert.ok(existsSync(`${root}/web/dist/joomla/site.zip`), 'Build first: npm run bundle && npm run web:build');
+
+    // An extension package for the blueprint test, served next to the playground.
+    mkdirSync(`${root}/web/dist/test-fixtures`, { recursive: true });
+    execFileSync('php', ['-r', `
+      $zip = new ZipArchive();
+      $zip->open($argv[2], ZipArchive::CREATE | ZipArchive::OVERWRITE);
+      $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($argv[1], FilesystemIterator::SKIP_DOTS));
+      foreach ($files as $file) {
+          $zip->addFile($file->getPathname(), str_replace(DIRECTORY_SEPARATOR, '/', substr($file->getPathname(), strlen($argv[1]) + 1)));
+      }
+      $zip->close();
+    `, `${root}/tests/fixtures/com_playgroundtest`, `${root}/web/dist/test-fixtures/com_playgroundtest.zip`]);
 
     server = spawn(process.execPath, [`${root}/node_modules/vite/bin/vite.js`, 'preview', '--config', 'web/vite.config.js', '--port', String(port), '--strictPort'], {
       cwd: root,
@@ -203,6 +215,86 @@ describe('Joomla Playground in the browser', () => {
 
     assert.equal(playground.site, null);
     assert.ok(await siteShows(page, playground, 'Written in the browser'), 'The imported site has the article');
+  });
+
+describe('Blueprints', () => {
+  let context;
+
+  before(async () => {
+    context = await browser.newContext();
+  });
+
+  after(async () => {
+    await context?.close();
+  });
+
+  test('sets up a new playground from a blueprint and query parameters', async () => {
+    const blueprint = {
+      landingPage: '/index.php',
+      steps: [
+        { step: 'installExtension', url: 'test-fixtures/com_playgroundtest.zip' },
+        { step: 'setGlobalConfig', values: { sitename: 'Blueprint Site' } },
+        { step: 'runSql', sql: "UPDATE #__playgroundtest_items SET title = 'Changed by a blueprint';" },
+        { step: 'enableExtension', element: 'debug', type: 'plugin', folder: 'system' },
+        { step: 'writeFile', path: 'images/blueprint.txt', data: 'Written by a blueprint' },
+        { step: 'importSampleData' },
+        {
+          step: 'runPHP',
+          code: `<?php
+            require 'configuration.php';
+            $db = new PDO('sqlite:data/joomla.sqlite');
+            file_put_contents('images/check.json', json_encode([
+                'php'      => PHP_VERSION,
+                'sitename' => (new JConfig())->sitename,
+                'item'     => $db->query('SELECT title FROM jos_playgroundtest_items')->fetchColumn(),
+                'debug'    => $db->query("SELECT enabled FROM jos_extensions WHERE element = 'debug' AND folder = 'system'")->fetchColumn(),
+                'articles' => $db->query('SELECT COUNT(*) FROM jos_content')->fetchColumn(),
+            ]));`,
+        },
+      ],
+    };
+    const tab = await context.newPage();
+
+    tab.on('pageerror', (error) => console.log('[pageerror]', error.message));
+    await tab.goto(`${appUrl}?php=8.3&login=no#${encodeURIComponent(JSON.stringify(blueprint))}`);
+
+    const result = await waitForPlayground(tab);
+
+    console.log('blueprint timings (ms):', JSON.stringify(result.timings));
+    assert.equal(result.blueprintError, null);
+    assert.equal(result.phpVersion, '8.3');
+
+    const check = await tab.evaluate(async (siteUrl) => {
+      const fetchText = async (path) => (await fetch(siteUrl + path)).text();
+
+      return {
+        check: JSON.parse(await fetchText('/images/check.json')),
+        file: await fetchText('/images/blueprint.txt'),
+        administrator: await fetchText('/administrator/index.php'),
+        frame: document.querySelector('#joomla').src,
+      };
+    }, result.siteUrl);
+
+    assert.match(check.check.php, /^8\.3\./);
+    assert.equal(check.check.sitename, 'Blueprint Site');
+    assert.equal(check.check.item, 'Changed by a blueprint');
+    assert.equal(String(check.check.debug), '1');
+    assert.ok(Number(check.check.articles) > 5, `Sample data installed: ${check.check.articles} articles`);
+    assert.equal(check.file, 'Written by a blueprint');
+    assert.match(check.administrator, /mod-login-username|id="form-login"/, 'login=no: the administrator shows the login form');
+    assert.equal(check.frame, `${result.siteUrl}/index.php`);
+    await tab.close();
+  });
+
+  test('reports a wrong blueprint', async () => {
+    const tab = await context.newPage();
+
+    await tab.goto(`${appUrl}#${encodeURIComponent(JSON.stringify({ steps: [{ step: 'installPlugin' }] }))}`);
+    await tab.waitForSelector('#status.error', { timeout: 60000 });
+
+    assert.match(await tab.locator('#status').textContent(), /unknown step "installPlugin"/);
+    await tab.close();
+  });
   });
 });
 

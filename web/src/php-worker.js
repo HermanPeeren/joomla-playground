@@ -6,6 +6,7 @@
 // - a saved site in the browser's private file system (OPFS): the zip it started from plus a snapshot of the files
 //   that changed since, rewritten shortly after requests that change files (see storage.js);
 // - an imported zip (an export of a playground).
+// A new playground can follow a blueprint (see blueprint.js): PHP version, landing page, steps to set it up.
 //
 // The page talks to it with messages { type, id, ... }; the worker answers { type: 'result', id, value | error }
 // and sends { type: 'progress', message } while it works.
@@ -14,9 +15,10 @@ import { PHP, PHPRequestHandler } from '@php-wasm/universal';
 import { loadWebRuntime } from '@php-wasm/web';
 import { journalFSEvents } from '@php-wasm/fs-journal';
 import { hasBase, readBase, readMeta, readSnapshot, siteLockName, writeBase, writeMeta, writeSnapshot } from './storage.js';
+import { DEFAULT_PHP_VERSION } from './blueprint.js';
+import { BlueprintError, runSteps } from './blueprint-steps.js';
 
 const DOCUMENT_ROOT = '/var/www/html';
-const PHP_VERSION = '8.4';
 
 /** Caches, logs and temporary files: left out of exports and snapshots (a PHP regular expression). */
 const SKIP = '#^(tmp|cache|administrator/cache|administrator/logs)/(?!index\\.html$)#';
@@ -37,7 +39,7 @@ const channel = new BroadcastChannel('joomla-playground');
  *          that were renamed (moved with all their files)
  * dirty:   whether files changed since the last snapshot
  *
- * @type {{php: PHP, handler: PHPRequestHandler, manifest: object, password: string, site: string|null,
+ * @type {{php: PHP, phpVersion: string, handler: PHPRequestHandler, manifest: object, password: string, site: string|null,
  *   base: {id: string|null, bytes: Uint8Array|null}, changes: {paths: Set<string>, trees: Set<string>}, dirty: boolean}}
  */
 let state = null;
@@ -84,8 +86,11 @@ function progress(message) {
  * @param {string} [options.site] Slug of a saved site to open, or to create from the bundle
  * @param {string} [options.title] Title for a new saved site
  * @param {ArrayBuffer} [options.zip] An exported playground to start from
+ * @param {string} [options.php] PHP version; default: the saved site's, or DEFAULT_PHP_VERSION
+ * @param {object} [options.blueprint] How to set up a new playground (see blueprint.js)
+ * @param {string} [options.corsProxy] URL prefix of a CORS proxy for downloads
  */
-async function boot({ base, scope, site = null, title = null, zip = null }) {
+async function boot({ base, scope, site = null, title = null, zip = null, php: phpVersion = null, blueprint = null, corsProxy = null }) {
   const started = performance.now();
   const timings = {};
   const lap = (name) => (timings[name] = Math.round(performance.now() - started));
@@ -95,13 +100,21 @@ async function boot({ base, scope, site = null, title = null, zip = null }) {
     await lockSite(site);
   }
 
-  progress(`Loading PHP ${PHP_VERSION}`);
   const meta = site ? await readMeta(site) : null;
+
+  phpVersion = phpVersion ?? meta?.php ?? DEFAULT_PHP_VERSION;
+  progress(`Loading PHP ${phpVersion}`);
   const [php, manifest, files] = await Promise.all([
-    loadWebRuntime(PHP_VERSION).then((runtime) => (lap('php'), new PHP(runtime))),
+    loadWebRuntime(phpVersion).then((runtime) => (lap('php'), new PHP(runtime))),
     fetch(new URL('joomla/manifest.json', base)).then((response) => response.json()),
     siteFiles({ base, site, meta, zip }).then((files) => (lap(meta ? 'read' : 'download'), files)),
   ]);
+
+  const joomla = blueprint?.preferredVersions?.joomla;
+
+  if (joomla && !`${manifest.joomla}.`.startsWith(`${joomla}.`)) {
+    throw new Error(`Joomla ${joomla} is not available in this playground; it has Joomla ${manifest.joomla}`);
+  }
 
   progress(meta ? 'Opening the saved site' : 'Unpacking Joomla');
   php.mkdir(DOCUMENT_ROOT);
@@ -163,20 +176,22 @@ async function boot({ base, scope, site = null, title = null, zip = null }) {
   `);
   lap('configure');
 
-  const handler = new PHPRequestHandler({
-    php,
-    documentRoot: DOCUMENT_ROOT,
-    absoluteUrl: siteUrl,
-    // Joomla's .htaccess sends unknown site paths to index.php (SEF URLs).
-    getFileNotFoundAction: (relativePath) =>
-      relativePath.startsWith('/administrator') || relativePath.startsWith('/api')
-        ? { type: '404' }
-        : { type: 'internal-redirect', uri: '/index.php' },
-  });
+  const createHandler = () =>
+    new PHPRequestHandler({
+      php,
+      documentRoot: DOCUMENT_ROOT,
+      absoluteUrl: siteUrl,
+      // Joomla's .htaccess sends unknown site paths to index.php (SEF URLs).
+      getFileNotFoundAction: (relativePath) =>
+        relativePath.startsWith('/administrator') || relativePath.startsWith('/api')
+          ? { type: '404' }
+          : { type: 'internal-redirect', uri: '/index.php' },
+    });
 
   state = {
     php,
-    handler,
+    phpVersion,
+    handler: createHandler(),
     manifest,
     password,
     site: null,
@@ -185,16 +200,56 @@ async function boot({ base, scope, site = null, title = null, zip = null }) {
     dirty: false,
   };
 
-  if (site && !meta) {
-    await persist(site, title ?? site);
-  } else if (meta) {
+  if (meta) {
     state.site = site;
-    await writeMeta(site, { ...meta, opened: new Date().toISOString() });
+    await writeMeta(site, { ...meta, php: phpVersion, opened: new Date().toISOString() });
   }
 
-  progress('Logging in');
-  await logIn(handler, siteUrl, password);
-  lap('login');
+  // A blueprint sets up a new playground only; a saved site is opened as it was.
+  const steps = meta ? [] : (blueprint?.steps ?? []);
+  const login = blueprint?.login !== false;
+  let blueprintError = null;
+
+  if (login || steps.length) {
+    progress('Logging in');
+    await logIn(state.handler, siteUrl, password);
+    lap('login');
+  }
+
+  if (steps.length) {
+    try {
+      await runSteps(steps, {
+        php,
+        siteUrl,
+        root: DOCUMENT_ROOT,
+        progress,
+        corsProxy,
+        baseUrl: blueprint.baseUrl ?? base,
+        request: (url, init = {}) => state.handler.request({ url, ...init }),
+        runPhp: (code) => runPhp(php, code),
+        logIn: () => logIn(state.handler, siteUrl, password),
+      });
+    } catch (error) {
+      if (!(error instanceof BlueprintError)) {
+        throw error;
+      }
+
+      blueprintError = error.message;
+    }
+
+    lap('blueprint');
+
+    // The steps ran logged in; a blueprint with "login": false starts logged out.
+    if (!login) {
+      state.handler = createHandler();
+    }
+  }
+
+  if (site && !meta) {
+    await persist(site, title ?? site);
+  }
+
+  lap('ready');
   scheduleSnapshot();
 
   channel.onmessage = ({ data }) => {
@@ -210,8 +265,10 @@ async function boot({ base, scope, site = null, title = null, zip = null }) {
       password,
       manifest,
       timings,
-      phpVersion: PHP_VERSION,
+      phpVersion,
       site: state.site,
+      landingPage: blueprint?.landingPage ?? null,
+      blueprintError,
       importedFrom: zip ? siteComment(php) : null,
     },
   };
@@ -275,6 +332,7 @@ async function persist(site, title) {
     password: state.password,
     joomla: state.manifest.joomla,
     driver: state.manifest.driver,
+    php: state.phpVersion,
     base: id,
     created: new Date().toISOString(),
   });

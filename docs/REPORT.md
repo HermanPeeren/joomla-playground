@@ -43,6 +43,9 @@ already been done by the WordPress Playground team and can be reused.
   it is ready about 2 s after the page loads (locally). The administrator is logged in automatically. The site,
   the administrator, forms, AJAX and static media work, and Chrome browser tests cover them. See §12.
 - **Public playground:** <https://hermanpeeren.github.io/joomla-playground/> (GitHub Pages). It is ready about 6 s after the page loads, downloads included.
+- **Update, 2026-10-22: phase 2, part 2.** A link sets up a new playground: PHP version (8.3, 8.4, 8.5),
+  landing page, login, extensions to install, or a whole blueprint with steps such as sample data, global
+  configuration and SQL. See §14.
 - **Update, 2026-10-22: phase 2, part 1.** Playgrounds can be saved in the browser (OPFS), reopened after a
   reload, listed under "My sites", exported as a zip and imported again. A saved site is stored as its starting
   zip plus a snapshot of its changes: saving takes 0.3 s instead of 13 s, and reopening takes 1–2 s more than a
@@ -648,7 +651,50 @@ the snapshot is the SQLite database (2 MB, 0.15 MB compressed).
 - sharing a playground through a URL (that needs a server or a blueprint);
 - Safari: its OPFS supports `createWritable()` only in recent versions; untested.
 
-## 14. Sources
+## 14. Phase 2, part 2: blueprints and the query API (2026-10-22)
+
+A link can now set up a new playground.
+- **Query API:** `?php=8.3|8.4|8.5`, `?url=<path>` (landing page), `?login=no`, `?extension=<zip URL>`
+  (repeatable), `?language=<tag>`, `?blueprint-url=<URL>`. `?joomla=<version>` is checked against the bundle:
+  only one Joomla version is built so far.
+- **Blueprint v0:** a JSON object in the URL fragment or at `?blueprint-url=`. It has `preferredVersions`,
+  `landingPage`, `login` and `steps`, close to WordPress Playground's Blueprints (v1 shape). The query parameters
+  are shortcuts added on top of it.
+- **Steps:** `installExtension`, `enableExtension`, `importSampleData`, `setGlobalConfig`, `setSiteLanguage`,
+  `runSql`, `runPHP`, `writeFile`, `unzip`, `login`.
+- A saved site opens as it was; a blueprint applies only to a new playground. A saved site remembers its PHP
+  version.
+
+**How the steps work**
+- They run in the PHP worker after login, before the page shows the site.
+- **Extensions** are installed the way a user does it: the worker posts the package to Joomla's installer
+  (**Upload Package File**), as `multipart/form-data` encoded by the browser's `FormData`. Then it reads the
+  messages Joomla queued; in Joomla 6 a successful install is a `success` message.
+- **Sample data** is installed like the Sample Data module does: `com_ajax` requests for step 1, 2, … of the
+  sample data plugin, until it has no further step. The blog sample data takes about 9 s.
+- `runSql`, `enableExtension` and `setSiteLanguage` boot Joomla's framework in a PHP script and use its database
+  driver. SQL is therefore MySQL syntax, with `#__` as the table prefix, whichever driver the site uses.
+- **Downloads** need CORS headers from the host. Without them, the worker can retry through a CORS proxy set at
+  build time (`VITE_CORS_PROXY`); none is deployed yet.
+- A failing step stops the blueprint; the playground still starts, and the toolbar shows which step failed and
+  why.
+
+**Found and fixed:** the MySQL emulation answers `SHOW VARIABLES LIKE 'max_heap_table_size'` with no rows. Smart
+Search reads that value when content is saved and printed a PHP warning. In an AJAX response, such as the
+sample data steps, the warning made the JSON unreadable. The `mysqlonsqlite` driver now answers
+`max_heap_table_size` and `max_allowed_packet` with MySQL's defaults.
+
+**PHP versions:** 8.3, 8.4 and 8.5 are built in. Each adds about 40 MB of WebAssembly to the static site
+(two builds per version, JSPI and Asyncify); a browser downloads only the one it uses.
+
+**Measured** (headless Chrome, local server): a blueprint with an extension install, sample data and five
+other steps on PHP 8.3 was ready in 12.8 s, of which the steps took 10.5 s.
+
+**Tests:** the browser suite (12 tests) adds:
+- a blueprint with all step types on PHP 8.3, logged out, landing on the front end;
+- a wrong blueprint gives an error.
+
+## 15. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)

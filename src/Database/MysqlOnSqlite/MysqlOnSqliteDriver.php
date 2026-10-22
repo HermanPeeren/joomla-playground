@@ -38,6 +38,15 @@ class MysqlOnSqliteDriver extends MysqlDriver
      */
     public $name = self::NAME;
 
+    /**
+     * Server variables Joomla asks for with SHOW VARIABLES, which the emulator answers with no rows: MySQL's defaults.
+     * Smart Search sizes its memory table from max_heap_table_size, and warns when it gets no row.
+     */
+    private const SERVER_VARIABLES = [
+        'max_allowed_packet'  => '67108864',
+        'max_heap_table_size' => '16777216',
+    ];
+
     public function __construct(array $options)
     {
         $options['driver']   = 'mysql';
@@ -97,6 +106,15 @@ class MysqlOnSqliteDriver extends MysqlDriver
     {
         if (!$this->connection instanceof \WP_MySQL_On_SQLite) {
             throw new PrepareStatementFailureException('Not connected to MySQL on SQLite');
+        }
+
+        if (preg_match("/^\s*SHOW\s+(?:SESSION\s+|GLOBAL\s+)?VARIABLES\s+LIKE\s+'([a-z_]+)'\s*;?\s*$/i", $query, $match)) {
+            $name  = strtolower($match[1]);
+            $value = self::SERVER_VARIABLES[$name] ?? null;
+
+            if ($value !== null) {
+                $query = "SELECT '$name' AS Variable_name, '$value' AS Value";
+            }
         }
 
         return new EmulatedPreparedStatement($this->connection, $query);

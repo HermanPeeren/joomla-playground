@@ -60,6 +60,11 @@ Then open http://localhost:5400/.
   need `localhost` or HTTPS.
 - The page starts PHP in a Web Worker and unpacks Joomla into memory. It then opens the administrator, already
   logged in.
+- PHP 8.3, 8.4 and 8.5 are built in (`web/vite.config.js`); the others point to a stub.
+- `VITE_CORS_PROXY` (at build time) sets a CORS proxy for blueprint downloads from hosts without CORS headers,
+  as a URL prefix to which the encoded download URL is appended, e.g. `https://proxy.example.org/?url=`.
+- Blueprints: `web/src/blueprint.js` reads them from the URL, `web/src/blueprint-steps.js` runs the steps in
+  the PHP worker.
 
 ## Joomla on SQLite with native PHP
 
