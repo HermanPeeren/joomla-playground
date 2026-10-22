@@ -1,7 +1,7 @@
 # Draft upstream issues: WordPress/sqlite-database-integration
 
 Drafts for reporting the gaps found while running Joomla 6.2 on `WP_MySQL_On_SQLite`
-(see [REPORT.md §10](../REPORT.md)). **Nothing here has been posted.** Herman decides what to post.
+(see [REPORT.md §10](../REPORT.md)). **Nothing here has been posted yet.** The project maintainers decide what to post.
 
 - Repository: <https://github.com/WordPress/sqlite-database-integration/issues>
 - Package: `wordpress/mysql-on-sqlite` 3.1.1 (the latest release, 2026-10-21). Its `src` folder is identical to
@@ -477,7 +477,7 @@ as a comment once an issue for prepared statements exists.
 > 3. **`rowCount()` for `SELECT`:** PDO MySQL returns the number of rows for buffered queries; the emulator returns
 >    `0`, like PDO SQLite. Joomla's `getNumRows()` relies on it in a few places.
 >
-> Our implementation is in [`EmulatedPreparedStatement`](https://github.com/HermanPeeren/joomla-playground/blob/spike/mysql-on-sqlite/src/Database/MysqlOnSqlite/EmulatedPreparedStatement.php),
+> Our implementation is in [`EmulatedPreparedStatement`](https://github.com/HermanPeeren/joomla-playground/blob/main/src/Database/MysqlOnSqlite/EmulatedPreparedStatement.php),
 > in case it is useful.
 
-**Before posting 7:** the link points to the `spike/mysql-on-sqlite` branch, which must be pushed for it to work.
+The link points to the `main` branch of joomla-playground, where the driver has been merged.

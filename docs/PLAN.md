@@ -27,7 +27,7 @@ runtime (`@php-wasm/*`) instead of rebuilding it.
 
 ## Phase 0: decisions and setup (½ day)
 
-- Repository name and location (e.g. `joomla-playground` under your GitHub account first, perhaps
+- Repository name and location (e.g. `joomla-playground` under a personal GitHub account first, perhaps
   `joomla-projects` later).
 - Tooling:
   - Node LTS + TypeScript + Vite for the web part.
@@ -179,7 +179,7 @@ pitch to the Joomla production department.
 - **Documentation and outreach:** docs site, Joomla Magazine article, JoomlaDay talk, and maybe a GSoC 2027
   project idea (e.g. blueprints or PR previews).
 
-## Open questions for you
+## Open questions
 
 1. Personal or community project from the start? Should we contact the Joomla production department or
    maintainers (and/or the TYPO3 Playground people at Macopedia) early?
