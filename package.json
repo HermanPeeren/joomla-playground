@@ -12,7 +12,8 @@
     "web:dev": "vite --config web/vite.config.js",
     "web:build": "vite build --config web/vite.config.js",
     "web:preview": "vite preview --config web/vite.config.js --port 5401",
-    "test:browser": "node --test --test-timeout=600000 tests/browser/playground.test.mjs"
+    "test:browser": "node --test --test-timeout=600000 tests/browser/playground.test.mjs",
+    "test:proxy": "node --test tests/proxy/cors-proxy.test.mjs"
   },
   "devDependencies": {
     "@php-wasm/fs-journal": "3.1.60",

@@ -712,7 +712,22 @@ other steps on PHP 8.3 was ready in 12.8 s, of which the steps took 10.5 s.
 - The browser tests now pick a free port. With a fixed port, a run could silently test the preview server of
   another checkout.
 
-## 16. Sources
+## 16. Phase 2, part 4: a CORS proxy (2026-10-22)
+
+Browsers only download from hosts that send CORS headers. GitHub Pages and raw.githubusercontent.com do;
+downloads.joomla.org, update.joomla.org and GitHub release assets do not. `proxy/cors-proxy.js` is a Cloudflare
+Worker that fetches such a file and returns it with CORS headers, like WordPress Playground's `php-cors-proxy`.
+- **Limits:** only GET and HEAD, only https, only allowed hosts (Joomla's download, update and extension hosts,
+  GitHub and its download hosts). It follows redirects itself, so every hop is checked. At most 50 MB, also when
+  the upstream sends no length. `ALLOWED_ORIGINS` limits which sites may use it. A Cloudflare rate limiting
+  binding allows 60 requests per minute per IP.
+- **Use:** blueprint downloads try the host directly first, then the proxy, when the playground was built with
+  `VITE_CORS_PROXY`. The Pages workflow takes it from the repository variable `CORS_PROXY`.
+- **Tests:** seven unit tests with a fake upstream (`npm run test:proxy`), in CI.
+- **Not done:** deploying it needs a Cloudflare account; the rate limit configuration is untested. PHP's own
+  outgoing requests (update checks, installing from within Joomla) do not use it yet.
+
+## 17. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)
