@@ -13,7 +13,10 @@ final class GlobalConfigurationTest extends IntegrationTestCase
         $form  = $admin->get('administrator/index.php?option=com_config');
 
         // plg_system_playground offers the driver as Database Type; Joomla itself only lists the framework's drivers.
-        $this->assertStringContainsString('<option value="playgroundsqlite" selected="selected">SQLite (Joomla Playground)</option>', $form->body);
+        $this->assertMatchesRegularExpression(
+            '#<option value="' . self::$site->driver . '" selected="selected">[^<]*\(Joomla Playground\)</option>#',
+            $form->body
+        );
 
         $pairs = array_values(array_filter(
             $form->formFields('application-form'),
@@ -29,7 +32,7 @@ final class GlobalConfigurationTest extends IntegrationTestCase
         $configuration = file_get_contents(self::$site->root . '/configuration.php');
 
         $this->assertStringContainsString("public \$sitename = 'Playground (saved)';", $configuration);
-        $this->assertStringContainsString("public \$dbtype = 'playgroundsqlite';", $configuration);
+        $this->assertStringContainsString("public \$dbtype = '" . self::$site->driver . "';", $configuration);
         $this->assertStringContainsString("public \$db = 'data/joomla.sqlite';", $configuration);
 
         // The site still works with the saved configuration.

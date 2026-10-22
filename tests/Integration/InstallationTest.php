@@ -21,7 +21,7 @@ final class InstallationTest extends IntegrationTestCase
     {
         $configuration = file_get_contents(self::$site->root . '/configuration.php');
 
-        $this->assertStringContainsString("public \$dbtype = 'playgroundsqlite';", $configuration);
+        $this->assertStringContainsString("public \$dbtype = '" . self::$site->driver . "';", $configuration);
         $this->assertStringContainsString("public \$db = 'data/joomla.sqlite';", $configuration);
         $this->assertDirectoryDoesNotExist(self::$site->root . '/installation');
     }
@@ -59,6 +59,10 @@ final class InstallationTest extends IntegrationTestCase
 
     public function testSequencesContinueAfterTheInstalledRows(): void
     {
+        if (self::$site->driver !== 'playgroundsqlite') {
+            $this->markTestSkipped('Only the PostgreSQL schema sets sequence positions; MySQL uses AUTO_INCREMENT.');
+        }
+
         $next = self::query("SELECT seq FROM sqlite_sequence WHERE name = 'jos_menu'")[0]['seq'];
 
         $this->assertGreaterThanOrEqual(101, (int) $next);

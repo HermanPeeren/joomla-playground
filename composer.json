@@ -3,9 +3,30 @@
     "description": "Joomla running in the browser via PHP-in-WebAssembly, comparable to WordPress Playground",
     "type": "project",
     "license": "GPL-2.0-or-later",
+    "repositories": [
+        {
+            "type": "package",
+            "package": {
+                "name": "wordpress/mysql-on-sqlite",
+                "version": "3.1.1",
+                "license": "GPL-2.0-or-later",
+                "autoload": {
+                    "files": [
+                        "packages/mysql-on-sqlite/src/load.php"
+                    ]
+                },
+                "source": {
+                    "url": "https://github.com/WordPress/sqlite-database-integration.git",
+                    "type": "git",
+                    "reference": "v3.1.1"
+                }
+            }
+        }
+    ],
     "require": {
         "php": "^8.3",
-        "ext-pdo_sqlite": "*"
+        "ext-pdo_sqlite": "*",
+        "wordpress/mysql-on-sqlite": "3.1.1"
     },
     "require-dev": {
         "joomla/database": "4.0.0",

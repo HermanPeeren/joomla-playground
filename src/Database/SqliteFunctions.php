@@ -60,6 +60,33 @@ final class SqliteFunctions
         ));
     }
 
+    /**
+     * MySQL's TIME_FORMAT(time, format): only the hour, minute, second and microsecond specifiers.
+     */
+    public static function timeFormat(?string $time, ?string $format): ?string
+    {
+        if ($time === null || $format === null || !preg_match('/(\d{1,3}):(\d\d)(?::(\d\d)(?:\.(\d{1,6}))?)?\s*$/', $time, $match)) {
+            return null;
+        }
+
+        [$hour, $minute, $second, $micro] = [(int) $match[1], (int) $match[2], (int) ($match[3] ?? 0), str_pad($match[4] ?? '', 6, '0')];
+        $hour12 = $hour % 12 === 0 ? 12 : $hour % 12;
+
+        return preg_replace_callback('/%(.)/', static fn (array $m): string => match ($m[1]) {
+            'H'      => sprintf('%02d', $hour),
+            'k'      => (string) $hour,
+            'h', 'I' => sprintf('%02d', $hour12),
+            'l'      => (string) $hour12,
+            'i'      => sprintf('%02d', $minute),
+            'S', 's' => sprintf('%02d', $second),
+            'f'      => $micro,
+            'p'      => $hour < 12 ? 'AM' : 'PM',
+            'T'      => sprintf('%02d:%02d:%02d', $hour, $minute, $second),
+            'r'      => sprintf('%02d:%02d:%02d %s', $hour12, $minute, $second, $hour < 12 ? 'AM' : 'PM'),
+            default  => $m[1],
+        }, $format);
+    }
+
     public static function soundex(?string $value): ?string
     {
         return $value === null ? null : soundex($value);

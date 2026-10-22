@@ -97,6 +97,6 @@ final class AdministratorPagesTest extends IntegrationTestCase
     {
         $page = self::admin()->get('administrator/index.php?option=com_admin&view=sysinfo');
 
-        $this->assertStringContainsString('playgroundsqlite', $page->body);
+        $this->assertStringContainsString(self::$site->driver, $page->body);
     }
 }

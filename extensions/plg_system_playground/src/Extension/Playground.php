@@ -11,6 +11,7 @@ use Joomla\CMS\Event\Model\PrepareFormEvent;
 use Joomla\CMS\Plugin\CMSPlugin;
 use Joomla\Database\DatabaseAwareTrait;
 use Joomla\Event\SubscriberInterface;
+use JoomlaPlayground\Database\MysqlOnSqlite\MysqlOnSqliteDriver;
 use JoomlaPlayground\Database\SqliteDriver;
 
 \defined('_JEXEC') or die;
@@ -42,14 +43,16 @@ final class Playground extends CMSPlugin implements SubscriberInterface
     {
         $form = $event->getForm();
 
-        if ($form->getName() !== 'com_config.application' || !$this->getDatabase() instanceof SqliteDriver) {
+        $db = $this->getDatabase();
+
+        if ($form->getName() !== 'com_config.application' || !($db instanceof SqliteDriver || $db instanceof MysqlOnSqliteDriver)) {
             return;
         }
 
         $form->load(
             '<form><fieldset name="database"><field name="dbtype" type="list" filter="string"'
             . ' label="COM_CONFIG_FIELD_DATABASE_TYPE_LABEL" description="COM_CONFIG_FIELD_DATABASE_TYPE_DESC">'
-            . '<option value="' . SqliteDriver::NAME . '">PLG_SYSTEM_PLAYGROUND_DATABASE_TYPE_SQLITE</option>'
+            . '<option value="' . $db->getName() . '">PLG_SYSTEM_PLAYGROUND_DATABASE_TYPE_' . strtoupper($db->getName()) . '</option>'
             . '</field></fieldset></form>',
             true
         );
