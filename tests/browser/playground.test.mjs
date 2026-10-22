@@ -35,6 +35,8 @@ describe('Joomla Playground in the browser', () => {
     // One browser context for all tabs: they share the service worker, storage (OPFS) and locks.
     page = await (await browser.newContext()).newPage();
     page.on('pageerror', (error) => console.log('[pageerror]', error.message));
+    // The PHP worker logs every snapshot of a saved site (size and duration).
+    page.on('console', (message) => message.text().startsWith('Snapshot of') && console.log(message.text()));
 
     await page.goto(appUrl);
     await page.waitForFunction(() => window.joomlaPlayground || document.querySelector('#status.error'), null, { timeout: 180000 });
@@ -143,6 +145,21 @@ describe('Joomla Playground in the browser', () => {
 
     assert.equal(playground.site, 'persistence-test');
     assert.ok(await siteShows(page, playground, 'Written in the browser'), 'The article survived the reload');
+  });
+
+  test('keeps changes made after saving', async () => {
+    const frame = await openInFrame('/administrator/index.php?option=com_content&task=article.add');
+
+    await frame.fill('#jform_title', 'Written after saving');
+    await frame.click('button.button-save');
+    await frame.waitForSelector('text=Article saved.', { timeout: 60000 });
+
+    // Reload right away: the page asks the worker to write its pending snapshot when it is hidden.
+    await page.reload();
+    playground = await waitForPlayground(page);
+    console.log('reopen timings after a change (ms):', JSON.stringify(playground.timings));
+
+    assert.ok(await siteShows(page, playground, 'Written after saving'), 'The change after saving survived the reload');
   });
 
   test('lists the saved site under My sites', async () => {

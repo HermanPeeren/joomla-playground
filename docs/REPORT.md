@@ -44,7 +44,9 @@ already been done by the WordPress Playground team and can be reused.
   the administrator, forms, AJAX and static media work, and Chrome browser tests cover them. See §12.
 - **Public playground:** <https://hermanpeeren.github.io/joomla-playground/> (GitHub Pages). It is ready about 6 s after the page loads, downloads included.
 - **Update, 2026-10-22: phase 2, part 1.** Playgrounds can be saved in the browser (OPFS), reopened after a
-  reload, listed under "My sites", exported as a zip and imported again. See §13.
+  reload, listed under "My sites", exported as a zip and imported again. A saved site is stored as its starting
+  zip plus a snapshot of its changes: saving takes 0.3 s instead of 13 s, and reopening takes 1–2 s more than a
+  new playground instead of 5 s more. See §13.
 
 ## 2. How WordPress Playground works, and what is reusable
 
@@ -573,8 +575,8 @@ A playground can now outlive the tab.
     [web.dev](https://web.dev/articles/origin-private-file-system)).
   - The page URL becomes `?site=<name>`.
   - The playground asks the browser for persistent storage, so the site is not evicted when storage runs low.
-- **Reopening** `?site=<name>`, also after a reload or a browser restart, copies the saved site from OPFS into
-  PHP's memory instead of unpacking the bundle. Each saved site keeps its Super User password.
+- **Reopening** `?site=<name>`, also after a reload or a browser restart, unpacks the saved site from OPFS into
+  PHP's memory instead of downloading the bundle. Each saved site keeps its Super User password.
 - **My sites** lists the saved sites, which can be opened or deleted.
 - **Export** downloads the whole site as a zip, without caches, logs or temporary files. The zip comment
   records the Joomla version and driver.
@@ -584,39 +586,64 @@ A playground can now outlive the tab.
 - **New** starts a new temporary playground.
 
 **How it works**
-- `@php-wasm/web` mounts the OPFS folder of the site at the document root (`createDirectoryHandleMountHandler`,
-  the mechanism WordPress Playground uses):
-  - an initial copy, in memory → OPFS when saving, or OPFS → memory when opening;
-  - then a journal of filesystem changes, written to OPFS after every PHP request.
-- **Storage layout** (`web/src/storage.js`): each site is `joomla-playground/sites/<slug>/files/` plus a
-  `meta.json` with title, password, Joomla version and dates.
+- A saved site is stored as two zips, not as its ~8,600 files:
+  - the **base**: the zip the site started from (the bundle's `site.zip`, or an imported export), stored once
+    and shared by every site made from it;
+  - a **snapshot**: the files that differ from the base, plus a list of the paths deleted from it.
+- **Change tracking:** `journalFSEvents()` from `@php-wasm/fs-journal` (the journal WordPress Playground uses)
+  notes every path below the document root that PHP writes, creates, deletes or renames. The set of changed paths
+  grows for the lifetime of the site; a reopened site starts with the paths in its snapshot.
+- **When a snapshot is written** (PHP zips the changed paths with `ZipArchive`; the worker writes the zip to OPFS):
+  - when the site is saved;
+  - after a form submission (any request but GET and HEAD) that changed files, before the next request runs: a
+    page that shows "Article saved." comes after the snapshot with the article;
+  - after other requests that changed files (sessions in the database, caches): 0.5 s after the last one, at most
+    5 s after the first;
+  - when the page is hidden or closed (`visibilitychange`, `pagehide`).
+  Snapshots run in the PHP request queue, so no request changes files while one is taken.
+- **Crash safety:** `createWritable()` writes to a temporary file that replaces the old snapshot only when it is
+  complete. A crash or a closed tab mid-write leaves the previous snapshot. On saving, the base and the first
+  snapshot are written before `meta.json`; a site without `meta.json` is not listed.
+- **Reopening** reads the base and the snapshot from OPFS while PHP loads, unpacks the base, then removes the
+  deleted paths and writes the changed files.
+- **Storage layout** (`web/src/storage.js`):
+  - `joomla-playground/bases/<sha-256>.zip`;
+  - `joomla-playground/sites/<slug>/snapshot.zip`;
+  - `joomla-playground/sites/<slug>/meta.json`: title, password, Joomla version, base and dates.
+  Deleting a site also deletes the bases that no other site uses.
+- **First version (before snapshots):** `@php-wasm/web` mounted an OPFS folder with all files of the site at the
+  document root (`createDirectoryHandleMountHandler`), with an initial copy and a journal written after every
+  request. With ~8,600 files, saving took 13 s and reopening 7.6 s.
 - **One tab per saved site:** two PHP workers writing the same files would overwrite each other. A Web Lock
   (`navigator.locks`) per site enforces this. A second tab gets a message. After a reload, the new page waits up
   to 5 s for the previous page's worker to let go.
 - **Page and worker** talk through a small request/response protocol (boot, save, export).
 
-**Measured** (headless Chrome, local server):
+**Measured** (headless Chrome, local server; three runs of the browser tests, the last one while another build
+ran on the same machine):
 
-| Action | Time |
-|---|---|
-| New playground from the bundle (ready) | 2.3 s |
-| Save (copy ~8,600 files to OPFS) | 13 s |
-| Reopen a saved site (ready) | 7.6 s, of which copying OPFS → memory is 5.4 s |
-| Export | 17.8 MB zip |
-| Import (ready) | 1.9 s |
+| Action | First version (all files in OPFS) | Snapshots |
+|---|---|---|
+| New playground from the bundle (ready) | 2.3 s | 2.0–3.7 s |
+| Save | 13 s | 0.26–0.34 s |
+| Snapshot after a change (~156 KB zip) | (journal after every request) | 50–115 ms |
+| Reopen a saved site (ready) | 7.6 s, of which copying OPFS → memory is 5.4 s | 3.0–4.7 s: 1–2 s more than a new playground in the same run |
+| Export | 17.8 MB zip | 17.8 MB zip |
+| Import (ready) | 1.9 s | 2.2–3.0 s |
 
-Saving and reopening are slow because of the number of files. An obvious improvement is to keep a saved site in
-OPFS as one zip of the changed state, or as the bundle plus a zip of the files that differ. That would make
-reopening about as fast as starting from the bundle.
+Reopening now costs about what a new playground costs: reading the base from OPFS (0.1–0.8 s) replaces the
+download, and restoring the snapshot takes about 15 ms. Unpacking the base after a reload took 1.2–2.0 s, against
+0.8–1.4 s for a new playground; probably because the worker of the previous page is still shutting down. Most of
+the snapshot is the SQLite database (2 MB, 0.15 MB compressed).
 
-**Tests:** the browser suite (9 tests) adds:
+**Tests:** the browser suite (10 tests) adds:
 - save, reload and check that the article is still there;
+- write a second article after saving, reload at once: it is still there;
 - the site under "My sites";
 - a second tab refused for the same saved site;
 - export, a new empty playground, then import: the article is back.
 
 **Not yet:**
-- faster saving and reopening (see above);
 - renaming a saved site;
 - sharing a playground through a URL (that needs a server or a blueprint);
 - Safari: its OPFS supports `createWritable()` only in recent versions; untested.

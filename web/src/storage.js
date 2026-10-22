@@ -1,15 +1,25 @@
 // Saved playgrounds in the browser's origin private file system (OPFS), shared by the page and the PHP worker.
 //
-//   joomla-playground/sites/<slug>/meta.json   title, Super User password, Joomla version, dates
-//   joomla-playground/sites/<slug>/files/      the site (Joomla root), kept in sync by the PHP worker
+//   joomla-playground/bases/<sha-256>.zip           the zip a site started from: the bundle (joomla/site.zip) or
+//                                                   an imported export; shared by the sites made from it
+//   joomla-playground/sites/<slug>/meta.json        title, Super User password, Joomla version, base, dates
+//   joomla-playground/sites/<slug>/snapshot.zip     the files that differ from the base, and the deleted paths
+//
+// A site is its base with the snapshot on top. The PHP worker rewrites the snapshot shortly after requests that
+// changed files; a few hundred kilobytes instead of ~8,600 files.
 
 const ROOT = 'joomla-playground';
 
-export async function sitesDirectory() {
-  const root = await navigator.storage.getDirectory();
-  const playground = await root.getDirectoryHandle(ROOT, { create: true });
+async function playgroundDirectory() {
+  return (await navigator.storage.getDirectory()).getDirectoryHandle(ROOT, { create: true });
+}
 
-  return playground.getDirectoryHandle('sites', { create: true });
+export async function sitesDirectory() {
+  return (await playgroundDirectory()).getDirectoryHandle('sites', { create: true });
+}
+
+async function basesDirectory() {
+  return (await playgroundDirectory()).getDirectoryHandle('bases', { create: true });
 }
 
 /**
@@ -27,8 +37,64 @@ export async function siteDirectory(slug, { create = false } = {}) {
   }
 }
 
-export async function filesDirectory(slug) {
-  return (await siteDirectory(slug, { create: true })).getDirectoryHandle('files', { create: true });
+/**
+ * Writes a file in one go. createWritable() writes to a temporary file that replaces the old one only on close(),
+ * so a crash or a closed tab in the middle leaves the previous version intact.
+ */
+async function writeFile(directory, name, bytes) {
+  const writable = await (await directory.getFileHandle(name, { create: true })).createWritable();
+
+  try {
+    await writable.write(bytes);
+    await writable.close();
+  } catch (error) {
+    await writable.abort().catch(() => {});
+
+    throw error;
+  }
+}
+
+/**
+ * @returns {Promise<Uint8Array|null>}
+ */
+async function readFile(directory, name) {
+  try {
+    return new Uint8Array(await (await (await directory.getFileHandle(name)).getFile()).arrayBuffer());
+  } catch (error) {
+    if (error.name === 'NotFoundError') {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+export async function hasBase(id) {
+  try {
+    await (await basesDirectory()).getFileHandle(`${id}.zip`);
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function writeBase(id, bytes) {
+  await writeFile(await basesDirectory(), `${id}.zip`, bytes);
+}
+
+export async function readBase(id) {
+  return readFile(await basesDirectory(), `${id}.zip`);
+}
+
+export async function writeSnapshot(slug, bytes) {
+  await writeFile(await siteDirectory(slug, { create: true }), 'snapshot.zip', bytes);
+}
+
+export async function readSnapshot(slug) {
+  const site = await siteDirectory(slug);
+
+  return site ? readFile(site, 'snapshot.zip') : null;
 }
 
 export async function readMeta(slug) {
@@ -48,11 +114,9 @@ export async function readMeta(slug) {
 }
 
 export async function writeMeta(slug, meta) {
-  const site = await siteDirectory(slug, { create: true });
-  const writable = await (await site.getFileHandle('meta.json', { create: true })).createWritable();
+  const json = JSON.stringify({ ...meta, slug, updated: new Date().toISOString() }, null, 2);
 
-  await writable.write(JSON.stringify({ ...meta, slug, updated: new Date().toISOString() }, null, 2));
-  await writable.close();
+  await writeFile(await siteDirectory(slug, { create: true }), 'meta.json', new TextEncoder().encode(json));
 }
 
 /**
@@ -74,8 +138,21 @@ export async function listSites() {
   return sites.sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
 }
 
+/**
+ * Deletes a site, and the bases no other site uses. A base written in the last hour stays: another tab may be saving
+ * a site from it that has no meta.json yet.
+ */
 export async function deleteSite(slug) {
   await (await sitesDirectory()).removeEntry(slug, { recursive: true });
+
+  const used = new Set((await listSites()).map((site) => `${site.base}.zip`));
+  const bases = await basesDirectory();
+
+  for await (const [name, handle] of bases.entries()) {
+    if (!used.has(name) && Date.now() - (await handle.getFile()).lastModified > 3600000) {
+      await bases.removeEntry(name).catch(() => {});
+    }
+  }
 }
 
 /**
