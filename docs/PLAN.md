@@ -159,6 +159,9 @@ pitch to the Joomla production department.
 ## Phase 2: MVP (≈ 1–2 months, part-time)
 
 - **Persistence:** save to OPFS ("My playgrounds"), export and import as a zip.
+  - **Done (2026-10-22)** (REPORT §13): Save…, reopen with `?site=`, My sites, Export, Import, New; one tab
+    per saved site.
+  - Next: faster saving and reopening (one zip instead of ~8,600 files in OPFS), and renaming.
 - **Query API:**
   - `?joomla=6.2|5.4|nightly&php=8.3|8.4|8.5&language=nl-NL&login=yes`
   - `?extension=<url to zip>`

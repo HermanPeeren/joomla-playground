@@ -6,8 +6,8 @@ PHP compiled to WebAssembly, no server, no account, a disposable site in a brows
 **Status: proof of concept, steps 1a–3.** Joomla 6.2 runs on SQLite (two database drivers), with native PHP,
 with PHP in WebAssembly in Node, and **in the browser**. See the [exploration report](docs/REPORT.md) and the [plan](docs/PLAN.md).
 
-**Try it:** <https://hermanpeeren.github.io/joomla-playground/>. Joomla starts in your browser tab, logged in to the administrator. Nothing is stored:
-reloading the page gives a new site.
+**Try it:** <https://hermanpeeren.github.io/joomla-playground/>. Joomla starts in your browser tab, logged in to the administrator. Reloading
+the page gives a new site, unless you save it in your browser (**Save…**) or export it as a zip.
 
 ## Why SQLite first
 
@@ -106,6 +106,8 @@ Then open http://localhost:5400/.
   logged in; the toolbar shows the Super User's password.
 - Service workers need `localhost` or HTTPS.
 - `npm run web:build` writes a static site to `web/dist/`, which any static web server can host.
+- **Save…** keeps a playground in your browser, and **My sites** reopens it. **Export** downloads it as a zip,
+  and **Import** starts a playground from such a zip.
 
 ## Tests
 
