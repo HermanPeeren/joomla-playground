@@ -15,11 +15,11 @@ WebAssembly. Native PHP with `pdo_sqlite` runs the same code, so this step answe
 
 There are two database drivers, both without changes to Joomla core:
 
-- **`playgroundsqlite`**: Joomla's PostgreSQL schema, converted to SQLite. It is fast and behaves like
-  PostgreSQL.
-- **`mysqlonsqlite`** (spike): Joomla's MySQL schema as it is, on WordPress's
+- **`mysqlonsqlite`** (default): Joomla's MySQL schema as it is, on WordPress's
   [MySQL emulation for SQLite](https://github.com/WordPress/sqlite-database-integration). It behaves like MySQL
-  and runs third-party MySQL install SQL, but is slower.
+  and runs third-party MySQL install SQL. In WebAssembly it is 1.2–1.5× slower than the other driver.
+- **`playgroundsqlite`**: Joomla's PostgreSQL schema, converted to SQLite. It is the faster fallback and
+  behaves like PostgreSQL.
 
 See [REPORT §10](docs/REPORT.md) for the comparison.
 
@@ -45,8 +45,10 @@ composer install
 ```
 
 ```bash
-php bin/install-sqlite-site.php --site=joomla --driver=playgroundsqlite --admin-password=<your password> --live-site=http://127.0.0.1:8080
+php bin/install-sqlite-site.php --site=joomla --admin-password=<your password> --live-site=http://127.0.0.1:8080
 ```
+
+This uses the default `mysqlonsqlite` driver; add `--driver=playgroundsqlite` for the other one.
 
 ```bash
 php -S 127.0.0.1:8080 -t joomla
@@ -93,7 +95,7 @@ composer test
   - Global Configuration;
   - the scheduler and the CLI.
 
-  `JOOMLA_TEST_DRIVER` (`playgroundsqlite` or `mysqlonsqlite`) chooses the database driver.
+  `JOOMLA_TEST_DRIVER` (`mysqlonsqlite`, the default, or `playgroundsqlite`) chooses the database driver.
   `JOOMLA_TEST_RUNTIME` (`native` or `wasm`) chooses whether PHP runs natively or in WebAssembly. The site is
   installed from the release set by `JOOMLA_VERSION` in `phpunit.xml.dist`, downloaded once into
   `.cache/`.
