@@ -21,7 +21,8 @@ See [REPORT §10](REPORT.md) for the comparison.
 | Part | What it does |
 |---|---|
 | [`web/`](../web) | The browser playground: page, PHP worker, service worker (`@php-wasm/web`, Vite) |
-| [`bin/build-browser-bundle.php`](../bin/build-browser-bundle.php) | Builds the pre-installed Joomla bundle for the browser |
+| [`bin/build-browser-bundles.php`](../bin/build-browser-bundles.php) | Builds a bundle for each Joomla version in [`joomla-versions.json`](../joomla-versions.json) |
+| [`bin/build-browser-bundle.php`](../bin/build-browser-bundle.php) | Builds the pre-installed Joomla bundle of one version for the browser |
 | [`src/Database/SqliteDriver.php`](../src/Database/SqliteDriver.php) | Driver for `$dbtype = 'playgroundsqlite'`, built on the Joomla Framework's SQLite driver |
 | [`src/Database/SqliteQuery.php`](../src/Database/SqliteQuery.php) | Query builder fixes: dates, `RANDOM()`, `REGEXP`, casts, `UPDATE … FROM`, window functions |
 | [`src/Database/SqliteFunctions.php`](../src/Database/SqliteFunctions.php) | PHP versions of SQL functions SQLite lacks (`REGEXP`, `CONCAT`, `SOUNDEX`, …) |
@@ -54,8 +55,12 @@ npm run web:dev
 ```
 
 Then open http://localhost:5400/.
-- `npm run bundle` downloads the Joomla release set by `JOOMLA_VERSION` in `phpunit.xml.dist` into `.cache/`,
-  installs it and packs it for the browser (`web/public/joomla/`).
+- `npm run bundle` builds a bundle for every Joomla version in `joomla-versions.json`
+  (`bin/build-browser-bundles.php`). It downloads Full Packages missing from `.cache/`, installs each, and packs
+  it for the browser in `web/public/joomla/<version>/`. `web/public/joomla/versions.json` lists them.
+  `--version=<version>` rebuilds one.
+- To offer another Joomla version, add it to `joomla-versions.json`; `default` is the version a new playground
+  gets. The integration tests use `JOOMLA_VERSION` (`phpunit.xml.dist`, CI).
 - `npm run web:dev` serves the playground.
 - `npm run web:build` writes a static site to `web/dist/`, which any static web server can host. Service workers
   need `localhost` or HTTPS.

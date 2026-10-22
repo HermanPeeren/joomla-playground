@@ -5,9 +5,6 @@ name: Deploy the playground
 on:
   workflow_dispatch:
 
-env:
-  JOOMLA_VERSION: 6.2.0
-
 permissions:
   contents: read
   pages: write
@@ -34,15 +31,11 @@ jobs:
         with:
           node-version: 24
 
-      - name: Download the Joomla package
-        run: |
-          file=".cache/Joomla_${JOOMLA_VERSION}-Stable-Full_Package.zip"
-          mkdir -p .cache && curl -sSfL -o "$file" "https://github.com/joomla/joomla-cms/releases/download/${JOOMLA_VERSION}/$(basename "$file")"
-
       - run: composer install --no-interaction --no-progress
       - run: npm ci --no-audit --no-fund
 
-      - name: Build the Joomla bundle and the playground
+      # One bundle per Joomla version in joomla-versions.json; the packages are downloaded from GitHub releases.
+      - name: Build the Joomla bundles and the playground
         run: |
           npm run bundle
           npm run web:build

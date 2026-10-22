@@ -80,16 +80,12 @@ jobs:
         with:
           node-version: 24
 
-      - name: Cache the Joomla package
+      # The Joomla packages of all bundles (joomla-versions.json); npm run bundle downloads those not cached.
+      - name: Cache the Joomla packages
         uses: actions/cache@v4
         with:
           path: .cache
-          key: joomla-${{ env.JOOMLA_VERSION }}
-
-      - name: Download the Joomla package
-        run: |
-          file=".cache/Joomla_${JOOMLA_VERSION}-Stable-Full_Package.zip"
-          test -f "$file" || (mkdir -p .cache && curl -sSfL -o "$file" "https://github.com/joomla/joomla-cms/releases/download/${JOOMLA_VERSION}/$(basename "$file")")
+          key: joomla-bundles-${{ hashFiles('joomla-versions.json') }}
 
       - run: composer install --no-interaction --no-progress
       - run: npm ci --no-audit --no-fund

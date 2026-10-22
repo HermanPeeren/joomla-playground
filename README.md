@@ -24,9 +24,13 @@ The toolbar above the site:
 | **Export** | Download the whole site as a zip. |
 | **Import…** | Start a playground from such a zip, e.g. one someone sent you. |
 
-On the right, **PHP** switches the PHP version (8.3, 8.4 or 8.5): a saved site reopens with it, a temporary
-playground starts again from the same link. Next to it, the toolbar shows the Super User's name and password, in case you log out or want to see the site
-as a logged-in user. Hover over the Joomla version for timings.
+On the right:
+- **Joomla** switches the Joomla version (6.2 or 5.4): a new temporary playground starts with it. A saved site
+  keeps the version it was made with.
+- **PHP** switches the PHP version (8.3, 8.4 or 8.5): a saved site reopens with it, a temporary playground starts
+  again from the same link.
+- The Super User's name and password, in case you log out or want to see the site as a logged-in user. Hover
+  over the database driver for timings.
 
 **Temporary or saved?**
 - A new playground is temporary: reloading the page or closing the tab throws it away.
@@ -38,8 +42,10 @@ as a logged-in user. Hover over the Joomla version for timings.
 
 **Good to know**
 - Use a recent Chrome, Edge or other Chromium browser; Firefox and Safari are not tested yet.
-- The site cannot reach the internet yet: installing extensions or languages from within Joomla and update
-  checks do not work. A link or blueprint can install extensions (see below).
+- The site reaches the internet through your browser, so only servers that allow requests from other websites
+  (CORS) answer. System > Install Languages shows the list of languages, but the language packs themselves
+  cannot be downloaded from there: download the zip and use **Upload Package File**. A link or blueprint can
+  install extensions (see below).
 - The Mail inbox keeps the mails until the page is reloaded.
 - Each tab is its own playground, with its own site and database.
 - Clearing your browser's site data for this address deletes the saved sites.
@@ -50,6 +56,7 @@ A link can say how a new playground should look. Add these to the address:
 
 | Parameter | Example | What it does |
 |---|---|---|
+| `joomla` | `?joomla=5.4` | Joomla version: 6.2 (default) or 5.4; `5` also works |
 | `php` | `?php=8.3` | PHP version: 8.3, 8.4 (default) or 8.5 |
 | `url` | `?url=/index.php` | The page to open first; default `/administrator/` |
 | `login` | `?login=no` | Start logged out |
@@ -63,7 +70,7 @@ front end:
 
 ```json
 {
-  "preferredVersions": { "php": "8.4" },
+  "preferredVersions": { "joomla": "6.2", "php": "8.4" },
   "landingPage": "/index.php",
   "steps": [
     { "step": "importSampleData" },

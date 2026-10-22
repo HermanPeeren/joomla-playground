@@ -63,9 +63,9 @@
 
     #status { color: var(--accent); }
     #status.error { color: var(--error); white-space: pre-wrap; }
-    #info, #credentials-label, #php-label { color: var(--muted); }
+    #info, #credentials-label, .version { color: var(--muted); }
 
-    #php-version {
+    .version select {
       padding: 2px 4px;
       border: 1px solid var(--muted);
       border-radius: 4px;
@@ -205,7 +205,8 @@
     <span id="status">Loading</span>
     <span class="spacer"></span>
     <span><span id="credentials-label">Super User:</span> <span id="credentials">…</span></span>
-    <label id="php-label">PHP <select id="php-version" disabled title="PHP version (WebAssembly)"></select></label>
+    <label class="version">Joomla <select id="joomla-version" disabled title="Joomla version"></select></label>
+    <label class="version">PHP <select id="php-version" disabled title="PHP version (WebAssembly)"></select></label>
     <span id="info"></span>
   </header>
   <iframe id="joomla" title="Joomla"></iframe>

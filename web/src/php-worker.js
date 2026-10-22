@@ -2,7 +2,7 @@
 //
 // It puts a Joomla site into PHP's in-memory filesystem, points it at this tab's scope URL, sets the Super User
 // password, logs in, and answers the requests the service worker sends for that scope. The site comes from:
-// - the pre-installed bundle (joomla/site.zip, see bin/build-browser-bundle.php): a temporary playground;
+// - a pre-installed bundle (joomla/<version>/site.zip, see bin/build-browser-bundles.php): a temporary playground;
 // - a saved site in the browser's private file system (OPFS): the zip it started from plus a snapshot of the files
 //   that changed since, rewritten shortly after requests that change files (see storage.js);
 // - an imported zip (an export of a playground).
@@ -85,7 +85,8 @@ function progress(message) {
 /**
  * @param {object} options
  * @param {string} options.base   URL of the playground (the folder of index.html)
- * @param {string} options.scope  This tab's scope, e.g. "scope-abc123"
+ * @param {string} options.scope  This tab's scope, e.g. "scope-abc123-6-2-0"
+ * @param {string} options.joomla The Joomla version of the bundle to use (joomla/<version>/)
  * @param {string} [options.site] Slug of a saved site to open, or to create from the bundle
  * @param {string} [options.title] Title for a new saved site
  * @param {ArrayBuffer} [options.zip] An exported playground to start from
@@ -93,7 +94,7 @@ function progress(message) {
  * @param {object} [options.blueprint] How to set up a new playground (see blueprint.js)
  * @param {string} [options.corsProxy] URL prefix of a CORS proxy for downloads
  */
-async function boot({ base, scope, site = null, title = null, zip = null, php: phpVersion = null, blueprint = null, corsProxy = null }) {
+async function boot({ base, scope, joomla, site = null, title = null, zip = null, php: phpVersion = null, blueprint = null, corsProxy = null }) {
   const started = performance.now();
   const timings = {};
   const lap = (name) => (timings[name] = Math.round(performance.now() - started));
@@ -114,15 +115,9 @@ async function boot({ base, scope, site = null, title = null, zip = null, php: p
   const [php, manifest, files] = await Promise.all([
     // Outgoing HTTP(S) from PHP goes through the browser's fetch() (see enableNetwork()).
     loadWebRuntime(phpVersion, { tcpOverFetch: { CAroot: caRoot } }).then((runtime) => (lap('php'), new PHP(runtime))),
-    fetch(new URL('joomla/manifest.json', base)).then((response) => response.json()),
-    siteFiles({ base, site, meta, zip }).then((files) => (lap(meta ? 'read' : 'download'), files)),
+    fetch(new URL(`joomla/${joomla}/manifest.json`, base)).then((response) => response.json()),
+    siteFiles({ bundle: new URL(`joomla/${joomla}/`, base), site, meta, zip }).then((files) => (lap(meta ? 'read' : 'download'), files)),
   ]);
-
-  const joomla = blueprint?.preferredVersions?.joomla;
-
-  if (joomla && !`${manifest.joomla}.`.startsWith(`${joomla}.`)) {
-    throw new Error(`Joomla ${joomla} is not available in this playground; it has Joomla ${manifest.joomla}`);
-  }
 
   await enableNetwork(php, caRoot);
   await prependFile(php, new URL(siteUrl).pathname);
@@ -296,9 +291,9 @@ async function boot({ base, scope, site = null, title = null, zip = null, php: p
 /**
  * The zip to start from (the bundle, an imported export, or a saved site's base), and a saved site's snapshot.
  */
-async function siteFiles({ base, site, meta, zip }) {
+async function siteFiles({ bundle, site, meta, zip }) {
   if (!meta) {
-    return { bytes: zip ? new Uint8Array(zip) : await download(new URL('joomla/site.zip', base)), snapshot: null };
+    return { bytes: zip ? new Uint8Array(zip) : await download(new URL('site.zip', bundle)), snapshot: null };
   }
 
   if (!meta.base) {

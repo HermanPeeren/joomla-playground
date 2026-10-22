@@ -4,7 +4,7 @@
 // ?site=<slug> opens a site saved in this browser; without it, a new temporary playground starts, set up by the
 // blueprint in the URL if there is one (see blueprint.js).
 
-import { deleteSite, freeSlug, isSiteOpen, listSites, renameSite } from './storage.js';
+import { deleteSite, freeSlug, isSiteOpen, listSites, readMeta, renameSite } from './storage.js';
 import { PHP_VERSIONS, blueprintFromUrl } from './blueprint.js';
 import { parseMail } from './mail.js';
 
@@ -21,6 +21,7 @@ const elements = {
   newSite: document.querySelector('#new-site'),
   reset: document.querySelector('#reset-site'),
   php: document.querySelector('#php-version'),
+  joomla: document.querySelector('#joomla-version'),
   save: document.querySelector('#save-site'),
   exportSite: document.querySelector('#export-site'),
   importSite: document.querySelector('#import-site'),
@@ -39,6 +40,9 @@ const elements = {
 
 let worker = null;
 let playground = null;
+
+/** The Joomla bundles of this playground: { default: '6.2.0', versions: [manifest, ...] } (joomla/versions.json). */
+let bundles = null;
 const pending = new Map();
 let nextId = 1;
 
@@ -55,6 +59,9 @@ function setBusy(busy) {
   for (const button of [elements.site, elements.admin, elements.newSite, elements.save, elements.exportSite, elements.importSite, elements.mail, elements.php]) {
     button.disabled = busy;
   }
+
+  // A saved site keeps the Joomla version it was made with.
+  elements.joomla.disabled = busy || Boolean(playground?.site);
 
   // A saved site keeps its changes; starting over is for temporary playgrounds.
   elements.reset.disabled = busy || Boolean(playground?.site);
@@ -110,9 +117,11 @@ async function boot(options = {}, transfer = []) {
   elements.frame.src = 'about:blank';
   startWorker();
 
-  const scope = `scope-${Math.random().toString(36).slice(2, 10)}`;
+  // The scope ends with the Joomla version: the service worker serves media files from that bundle.
+  const joomla = options.joomla ?? bundles.default;
+  const scope = `scope-${Math.random().toString(36).slice(2, 10)}-${joomla.replaceAll('.', '-')}`;
 
-  playground = await call('boot', { base: base.href, scope, corsProxy, ...options }, transfer);
+  playground = await call('boot', { base: base.href, scope, corsProxy, ...options, joomla }, transfer);
   show(playground.landingPage ?? '/administrator/');
 
   if (playground.blueprintError) {
@@ -130,6 +139,7 @@ function show(path = '/administrator/') {
   elements.credentials.textContent = `${playground.username} / ${playground.password}`;
   elements.info.textContent = `Joomla ${playground.manifest.joomla} · ${playground.manifest.driver}`;
   elements.php.value = playground.phpVersion;
+  elements.joomla.value = playground.manifest.joomla;
   elements.info.title = Object.entries(playground.timings).map(([step, ms]) => `${step}: ${ms} ms`).join('\n');
   elements.frame.src = `${playground.siteUrl}${path}`;
   setBusy(false);
@@ -191,8 +201,10 @@ async function importSite(file) {
   history.replaceState(null, '', base.pathname);
 
   try {
-    const result = await boot({ zip: bytes }, [bytes]);
-    const from = result.importedFrom;
+    // An export says which Joomla version it holds: use the bundle of that version, if there is one.
+    const from = zipComment(bytes);
+    const joomla = bundles.versions.some((bundle) => bundle.joomla === from?.joomla) ? from.joomla : bundles.default;
+    const result = await boot({ zip: bytes, joomla }, [bytes]);
 
     if (from?.joomla && from.joomla !== result.manifest.joomla) {
       setStatus(`Imported a Joomla ${from.joomla} site into the Joomla ${result.manifest.joomla} playground: media files may not match`, true);
@@ -320,6 +332,90 @@ function switchPhp() {
   location.href = url.href;
 }
 
+function switchJoomla() {
+  const version = elements.joomla.value;
+  const url = new URL(location.href);
+
+  if (!confirm(`Start a new playground with Joomla ${version}? This one is not saved and will be lost.`)) {
+    elements.joomla.value = playground.manifest.joomla;
+
+    return;
+  }
+
+  url.searchParams.set('joomla', version);
+  location.href = url.href;
+}
+
+/**
+ * The Joomla version to start: a saved site's own, the one a blueprint or ?joomla= asks for (a version or its
+ * start, like "5" or "5.4"), or the default.
+ */
+async function chooseJoomla(site, blueprint) {
+  const available = bundles.versions.map((bundle) => bundle.joomla);
+
+  if (site) {
+    const meta = await readMeta(site);
+
+    if (!meta || available.includes(meta.joomla)) {
+      return { joomla: meta?.joomla ?? bundles.default };
+    }
+
+    return { joomla: bundles.default, warning: `This site was made with Joomla ${meta.joomla}, which this playground no longer has: its media files come from Joomla ${bundles.default}` };
+  }
+
+  const wanted = blueprint?.preferredVersions?.joomla;
+
+  if (!wanted) {
+    return { joomla: bundles.default };
+  }
+
+  const joomla = available.find((version) => `${version}.`.startsWith(`${wanted}.`));
+
+  if (!joomla) {
+    throw new Error(`Joomla ${wanted} is not available; choose ${available.join(', ')}`);
+  }
+
+  return { joomla };
+}
+
+/**
+ * The JSON comment of a zip (an export of a playground), or null.
+ */
+function zipComment(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const view = new DataView(buffer);
+
+  // The end of central directory record: signature, ..., comment length at +20, comment at +22.
+  for (let offset = bytes.length - 22; offset >= Math.max(0, bytes.length - 22 - 65535); offset--) {
+    if (view.getUint32(offset, true) === 0x06054b50) {
+      try {
+        return JSON.parse(new TextDecoder().decode(bytes.subarray(offset + 22, offset + 22 + view.getUint16(offset + 20, true))));
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * The newest service worker: after a new deploy, the previous one would not know the bundles' URLs.
+ */
+async function newestServiceWorker(registration) {
+  await registration.update().catch(() => {});
+
+  const pending = registration.installing ?? registration.waiting;
+
+  if (pending) {
+    await new Promise((resolve) => {
+      pending.addEventListener('statechange', () => ['activated', 'redundant'].includes(pending.state) && resolve());
+    });
+  }
+
+  await navigator.serviceWorker.ready;
+}
+
 function startOver() {
   if (confirm('Throw this playground away and start again from the same link?')) {
     location.reload();
@@ -332,8 +428,11 @@ async function start() {
   }
 
   setStatus('Starting the service worker');
-  await navigator.serviceWorker.register(new URL('sw.js', base), { scope: base.pathname });
-  await navigator.serviceWorker.ready;
+  await newestServiceWorker(await navigator.serviceWorker.register(new URL('sw.js', base), { scope: base.pathname }));
+
+  bundles = await (await fetch(new URL('joomla/versions.json', base))).json();
+  elements.joomla.replaceChildren(...bundles.versions.map((bundle) => new Option(bundle.joomla, bundle.joomla)));
+  elements.joomla.onchange = switchJoomla;
 
   elements.site.onclick = () => (elements.frame.src = `${playground.siteUrl}/`);
   elements.admin.onclick = () => (elements.frame.src = `${playground.siteUrl}/administrator/`);
@@ -361,7 +460,13 @@ async function start() {
   const site = url.searchParams.get('site');
   const blueprint = await blueprintFromUrl(url);
 
-  await boot({ ...(site ? { site } : {}), php: blueprint?.preferredVersions?.php ?? null, blueprint });
+  const { joomla, warning } = await chooseJoomla(site, blueprint);
+
+  await boot({ ...(site ? { site } : {}), joomla, php: blueprint?.preferredVersions?.php ?? null, blueprint });
+
+  if (warning) {
+    setStatus(warning, true);
+  }
 
   // A saved site remembers its PHP version: its address needs no ?php any more.
   if (site && url.searchParams.has('php')) {
