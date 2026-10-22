@@ -6,7 +6,7 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 
@@ -32,7 +32,8 @@ describe('Joomla Playground in the browser', () => {
     browser = await chromium.launch(
       process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: 'chrome' }
     );
-    page = await browser.newPage();
+    // One browser context for all tabs: they share the service worker, storage (OPFS) and locks.
+    page = await (await browser.newContext()).newPage();
     page.on('pageerror', (error) => console.log('[pageerror]', error.message));
 
     await page.goto(appUrl);
@@ -100,7 +101,8 @@ describe('Joomla Playground in the browser', () => {
   });
 
   test('a second tab gets its own site and database', async () => {
-    const second = await browser.newPage();
+    // Same browser context: same service worker and storage, like a second tab.
+    const second = await page.context().newPage();
 
     try {
       await second.goto(appUrl);
@@ -123,7 +125,97 @@ describe('Joomla Playground in the browser', () => {
       await second.close();
     }
   });
+
+  test('saves the playground in the browser and opens it again after a reload', async () => {
+    page.once('dialog', (dialog) => dialog.accept('Persistence test'));
+    const saveStarted = Date.now();
+    await page.click('#save-site');
+    await page.waitForFunction(
+      () => location.search === '?site=persistence-test' && document.querySelector('#status').textContent.includes('saved as'),
+      null,
+      { timeout: 120000 }
+    );
+    console.log(`saving took ${Date.now() - saveStarted} ms`);
+
+    await page.reload();
+    playground = await waitForPlayground(page);
+    console.log('reopen timings (ms):', JSON.stringify(playground.timings));
+
+    assert.equal(playground.site, 'persistence-test');
+    assert.ok(await siteShows(page, playground, 'Written in the browser'), 'The article survived the reload');
+  });
+
+  test('lists the saved site under My sites', async () => {
+    await page.click('#sites-menu summary');
+    await page.waitForSelector('#sites-list a:has-text("Persistence test")', { timeout: 10000 });
+    await page.click('#sites-menu summary');
+  });
+
+  test('opens a saved site in one tab only', async () => {
+    const second = await page.context().newPage();
+
+    try {
+      await second.goto(`${appUrl}?site=persistence-test`);
+      await second.waitForSelector('#status.error', { timeout: 120000 });
+
+      assert.match(await second.locator('#status').textContent(), /open in another tab/);
+    } finally {
+      await second.close();
+    }
+  });
+
+  test('exports the site as a zip and imports it into a new playground', async () => {
+    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 120000 }), page.click('#export-site')]);
+    const file = `${root}/build/browser-export.zip`;
+
+    await download.saveAs(file);
+    assert.ok(statSync(file).size > 5_000_000, 'The export holds the whole site');
+    console.log(`export: ${(statSync(file).size / 1048576).toFixed(1)} MB`);
+
+    // A new temporary playground does not have the article...
+    await page.goto(appUrl);
+    const fresh = await waitForPlayground(page);
+
+    assert.equal(fresh.site, null);
+    assert.equal(await siteShows(page, fresh, 'Written in the browser', 5000), false);
+
+    // ...the imported one does.
+    await page.setInputFiles('#import-file', file);
+    playground = await waitForPlayground(page, fresh.siteUrl);
+    console.log('import timings (ms):', JSON.stringify(playground.timings));
+
+    assert.equal(playground.site, null);
+    assert.ok(await siteShows(page, playground, 'Written in the browser'), 'The imported site has the article');
+  });
 });
+
+/**
+ * Waits until the page runs a playground (a new one, if the previous site URL is given).
+ */
+async function waitForPlayground(target, previousSiteUrl = null) {
+  await target.waitForFunction(
+    (previous) => document.querySelector('#status.error') || (window.joomlaPlayground && window.joomlaPlayground.siteUrl !== previous),
+    previousSiteUrl,
+    { timeout: 180000 }
+  );
+
+  const result = await target.evaluate(() => window.joomlaPlayground);
+
+  assert.ok(result && result.siteUrl !== previousSiteUrl, await target.locator('#status').textContent());
+
+  return result;
+}
+
+/**
+ * Whether the site's category page of the given playground shows a text.
+ */
+async function siteShows(target, current, text, timeout = 60000) {
+  const frame = await (await target.waitForSelector('#joomla')).contentFrame();
+
+  await frame.goto(`${current.siteUrl}/index.php?option=com_content&view=category&id=2`, { timeout: 120000 });
+
+  return frame.waitForSelector(`text=${text}`, { timeout }).then(() => true, () => false);
+}
 
 async function joomlaFrame() {
   const handle = await page.waitForSelector('#joomla');

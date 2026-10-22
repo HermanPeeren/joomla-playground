@@ -67,6 +67,54 @@
     #credentials { font-family: ui-monospace, Consolas, monospace; }
     .spacer { flex: 1; }
 
+    .separator {
+      width: 1px;
+      align-self: stretch;
+      background: var(--muted);
+      opacity: 0.4;
+    }
+
+    #sites-menu { position: relative; }
+
+    #sites-menu summary {
+      padding: 4px 12px;
+      border: 1px solid var(--muted);
+      border-radius: 4px;
+      cursor: pointer;
+      list-style: none;
+    }
+
+    #sites-menu summary::-webkit-details-marker { display: none; }
+    #sites-menu summary::after { content: " ▾"; }
+
+    #sites-list {
+      position: absolute;
+      z-index: 10;
+      top: calc(100% + 6px);
+      left: 0;
+      min-width: 320px;
+      max-width: calc(100vw - 32px);
+      margin: 0;
+      padding: 6px 0;
+      list-style: none;
+      background: var(--page);
+      color: #1a1a1a;
+      border-radius: 6px;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+    }
+
+    #sites-list li {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0 12px;
+      padding: 6px 12px;
+    }
+
+    #sites-list li.empty { display: block; color: #666; }
+    #sites-list a { color: #1a5fb4; font-weight: 600; }
+    #sites-list .details { grid-column: 1; font-size: 12px; color: #666; }
+    #sites-list button { grid-row: 1 / span 2; grid-column: 2; align-self: center; color: #a51d2d; border-color: #c6a0a6; }
+
     iframe {
       flex: 1;
       width: 100%;
@@ -79,6 +127,16 @@
     <h1>Joomla Playground</h1>
     <button id="open-site" type="button" disabled>Site</button>
     <button id="open-admin" type="button" disabled>Administrator</button>
+    <span class="separator"></span>
+    <button id="new-site" type="button" disabled title="Start a new, empty playground">New</button>
+    <button id="save-site" type="button" disabled title="Keep this playground in your browser">Save…</button>
+    <button id="export-site" type="button" disabled title="Download the whole site as a zip">Export</button>
+    <button id="import-site" type="button" disabled title="Start a playground from an exported zip">Import…</button>
+    <input id="import-file" type="file" accept=".zip,application/zip" hidden>
+    <details id="sites-menu">
+      <summary>My sites</summary>
+      <ul id="sites-list"></ul>
+    </details>
     <span id="status">Loading</span>
     <span class="spacer"></span>
     <span><span id="credentials-label">Super User:</span> <span id="credentials">…</span></span>

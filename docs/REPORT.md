@@ -43,6 +43,8 @@ already been done by the WordPress Playground team and can be reused.
   it is ready about 2 s after the page loads (locally). The administrator is logged in automatically. The site,
   the administrator, forms, AJAX and static media work, and Chrome browser tests cover them. See §12.
 - **Public playground:** <https://hermanpeeren.github.io/joomla-playground/> (GitHub Pages). It is ready about 6 s after the page loads, downloads included.
+- **Update, 2026-10-22: phase 2, part 1.** Playgrounds can be saved in the browser (OPFS), reopened after a
+  reload, listed under "My sites", exported as a zip and imported again. See §13.
 
 ## 2. How WordPress Playground works, and what is reusable
 
@@ -562,7 +564,64 @@ real Chrome does.
     logged in at 5.9 s.
 - **Blueprints and the query API.**
 
-## 13. Sources
+## 13. Phase 2, part 1: saving, export and import (2026-10-22)
+
+A playground can now outlive the tab.
+- **Save…** keeps the running site in the browser, in the **Origin Private File System** (OPFS).
+  - OPFS is storage that browsers give each website: a private file system that only that site can read and
+    write ([MDN](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system),
+    [web.dev](https://web.dev/articles/origin-private-file-system)).
+  - The page URL becomes `?site=<name>`.
+  - The playground asks the browser for persistent storage, so the site is not evicted when storage runs low.
+- **Reopening** `?site=<name>`, also after a reload or a browser restart, copies the saved site from OPFS into
+  PHP's memory instead of unpacking the bundle. Each saved site keeps its Super User password.
+- **My sites** lists the saved sites, which can be opened or deleted.
+- **Export** downloads the whole site as a zip, without caches, logs or temporary files. The zip comment
+  records the Joomla version and driver.
+- **Import** starts a new, temporary playground from such a zip; it can then be saved again. Importing an
+  export of another Joomla version gives a warning, because the media files come from the playground's own
+  bundle.
+- **New** starts a new temporary playground.
+
+**How it works**
+- `@php-wasm/web` mounts the OPFS folder of the site at the document root (`createDirectoryHandleMountHandler`,
+  the mechanism WordPress Playground uses):
+  - an initial copy, in memory → OPFS when saving, or OPFS → memory when opening;
+  - then a journal of filesystem changes, written to OPFS after every PHP request.
+- **Storage layout** (`web/src/storage.js`): each site is `joomla-playground/sites/<slug>/files/` plus a
+  `meta.json` with title, password, Joomla version and dates.
+- **One tab per saved site:** two PHP workers writing the same files would overwrite each other. A Web Lock
+  (`navigator.locks`) per site enforces this. A second tab gets a message. After a reload, the new page waits up
+  to 5 s for the previous page's worker to let go.
+- **Page and worker** talk through a small request/response protocol (boot, save, export).
+
+**Measured** (headless Chrome, local server):
+
+| Action | Time |
+|---|---|
+| New playground from the bundle (ready) | 2.3 s |
+| Save (copy ~8,600 files to OPFS) | 13 s |
+| Reopen a saved site (ready) | 7.6 s, of which copying OPFS → memory is 5.4 s |
+| Export | 17.8 MB zip |
+| Import (ready) | 1.9 s |
+
+Saving and reopening are slow because of the number of files. An obvious improvement is to keep a saved site in
+OPFS as one zip of the changed state, or as the bundle plus a zip of the files that differ. That would make
+reopening about as fast as starting from the bundle.
+
+**Tests:** the browser suite (9 tests) adds:
+- save, reload and check that the article is still there;
+- the site under "My sites";
+- a second tab refused for the same saved site;
+- export, a new empty playground, then import: the article is back.
+
+**Not yet:**
+- faster saving and reopening (see above);
+- renaming a saved site;
+- sharing a playground through a URL (that needs a server or a blueprint);
+- Safari: its OPFS supports `createWritable()` only in recent versions; untested.
+
+## 14. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)
