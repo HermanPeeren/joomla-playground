@@ -11,12 +11,15 @@ final class ExtensionSqlTest extends IntegrationTestCase
 {
     public function testExtensionWithMysqlOnlySql(): void
     {
+        // Copy the fixture into the site, where PHP can see it in either runtime.
+        self::copyTree(__DIR__ . '/../fixtures/com_playgroundtest', self::$site->root . '/tmp/com_playgroundtest');
+
         $admin = self::admin();
         $form  = $admin->get('administrator/index.php?option=com_installer&view=install');
 
         $installed = $admin->post('administrator/index.php?option=com_installer&view=install', [
             'installtype'       => 'folder',
-            'install_directory' => realpath(__DIR__ . '/../fixtures/com_playgroundtest'),
+            'install_directory' => self::$site->sitePath('tmp/com_playgroundtest'),
             'task'              => 'install.install',
             $form->token()      => '1',
         ]);
@@ -31,6 +34,21 @@ final class ExtensionSqlTest extends IntegrationTestCase
             $this->assertSame('First item', self::query('SELECT title FROM jos_playgroundtest_items')[0]['title']);
         } else {
             $this->assertFalse($tableExists, 'Known limitation of the SQLite driver: MySQL-only extension SQL is skipped');
+        }
+    }
+
+    private static function copyTree(string $source, string $target): void
+    {
+        $items = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($source, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::SELF_FIRST
+        );
+
+        is_dir($target) || mkdir($target, 0755, true);
+
+        foreach ($items as $item) {
+            $path = $target . '/' . substr($item->getPathname(), \strlen($source) + 1);
+            $item->isDir() ? (is_dir($path) || mkdir($path, 0755, true)) : copy($item->getPathname(), $path);
         }
     }
 }

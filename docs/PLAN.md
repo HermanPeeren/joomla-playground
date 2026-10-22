@@ -1,6 +1,6 @@
 # Joomla Playground — draft build plan
 
-*Starting point for discussion. Builds on [REPORT.md](REPORT.md). Status 2026-10-22: phase 1 steps 1a (Joomla on SQLite) and 1b (MySQL emulated on SQLite) done; next is step 2 (`@php-wasm/node`), which also decides the default database driver.*
+*Starting point for discussion. Builds on [REPORT.md](REPORT.md). Status 2026-10-22: phase 1 steps 1a (Joomla on SQLite), 1b (MySQL emulated on SQLite) and 2 (Joomla in `@php-wasm/node`) done; next is step 3, Joomla in the browser.*
 
 ## Goal
 
@@ -110,6 +110,17 @@ unchanged.
   default driver can be chosen (see step 1b).
 - Set `live_site`: if php-wasm reports a SAPI name containing "cli", Joomla's `Uri::base()` takes the CLI
   branch, as it does with `php -S`.
+
+**Done (2026-10-22).** `wasm/joomla-wasm.mjs` serves and runs the CLI of an installed site in `@php-wasm/node`.
+- **Tests:** all 73 integration tests pass in WebAssembly with both drivers, and CI runs them.
+- **Checks:** `PHP_SAPI` is `wasm`, so Joomla needs no `live_site`; integers are 64-bit; `intl` is opt-in and
+  `sodium` is missing, which `sodium_compat` covers.
+- **Speed:** WebAssembly costs 5–8×. The MySQL emulation adds only 1.2–1.5× on top (REPORT §11).
+- **Recommendation:** make `mysqlonsqlite` the default driver and keep `playgroundsqlite` as the fast
+  fallback. Waiting for your go-ahead.
+- **For step 3:**
+  - Find out why OPcache does not report itself active, and try JSPI builds; both are speed levers.
+  - Load the site into MEMFS instead of NODEFS.
 
 ### Step 3: Joomla in the browser · *3–5 days*
 

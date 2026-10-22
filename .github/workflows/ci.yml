@@ -11,7 +11,7 @@ env:
 
 jobs:
   tests:
-    name: PHP ${{ matrix.php }}, ${{ matrix.driver }}
+    name: PHP ${{ matrix.php }}, ${{ matrix.driver }}, ${{ matrix.runtime }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -19,6 +19,11 @@ jobs:
         php: ['8.3', '8.4']
         # playgroundsqlite: Joomla's PostgreSQL schema on SQLite; mysqlonsqlite: MySQL emulated on SQLite (spike)
         driver: [playgroundsqlite, mysqlonsqlite]
+        runtime: [native]
+        include:
+          # The site served and the CLI run by PHP 8.4 compiled to WebAssembly (@php-wasm/node)
+          - { php: '8.3', driver: playgroundsqlite, runtime: wasm }
+          - { php: '8.3', driver: mysqlonsqlite, runtime: wasm }
 
     steps:
       - uses: actions/checkout@v4
@@ -35,7 +40,15 @@ jobs:
           path: .cache
           key: joomla-${{ env.JOOMLA_VERSION }}
 
+      - uses: actions/setup-node@v4
+        if: matrix.runtime == 'wasm'
+        with:
+          node-version: 24
+
       - run: composer install --no-interaction --no-progress
+
+      - run: npm ci --no-audit --no-fund
+        if: matrix.runtime == 'wasm'
 
       - name: Unit tests
         run: vendor/bin/phpunit --testsuite unit
@@ -44,6 +57,7 @@ jobs:
         run: vendor/bin/phpunit --testsuite integration
         env:
           JOOMLA_TEST_DRIVER: ${{ matrix.driver }}
+          JOOMLA_TEST_RUNTIME: ${{ matrix.runtime }}
 
       - name: PHP server log
         if: failure()
