@@ -11,6 +11,8 @@
  *
  * Options:
  *   --site=DIR              Joomla root, unpacked from a Full Package, still containing installation/ (required)
+ *   --driver=DRIVER         playgroundsqlite (default): Joomla's PostgreSQL schema converted to SQLite;
+ *                           mysqlonsqlite: Joomla's MySQL schema on WordPress's MySQL emulation for SQLite (spike)
  *   --db=PATH               SQLite database file, relative to the Joomla root (default: data/joomla.sqlite)
  *   --prefix=PREFIX         Table prefix (default: jos_)
  *   --site-name=NAME        Site name (default: Joomla Playground)
@@ -25,7 +27,8 @@
  * Steps:
  *   1. copy the overlay (autoloader, defines.php files, database driver) into the site;
  *   2. boot Joomla's own installation application;
- *   3. create the tables from installation/sql/postgresql, converted to SQLite;
+ *   3. create the tables: from installation/sql/postgresql converted to SQLite (playgroundsqlite), or from
+ *      installation/sql/mysql as it is (mysqlonsqlite);
  *   4. run Joomla's ConfigurationModel::setup(): configuration.php, schema version, manifest caches, Super User;
  *   5. delete the installation folder;
  *   6. install the Joomla Playground system plugin (plg_system_playground) with the site's CLI.
@@ -34,7 +37,7 @@
 const PLAYGROUND_ROOT = __DIR__ . '/..';
 
 $options = getopt('', [
-    'site:', 'db:', 'prefix:', 'site-name:', 'admin-name:', 'admin-username:', 'admin-password:', 'admin-email:',
+    'site:', 'driver:', 'db:', 'prefix:', 'site-name:', 'admin-name:', 'admin-username:', 'admin-password:', 'admin-email:',
     'live-site:', 'keep-installation', 'help',
 ]);
 
@@ -54,9 +57,18 @@ if (is_file($site . '/configuration.php')) {
 }
 
 $generatedPassword = !isset($options['admin-password']);
+$drivers           = [
+    'playgroundsqlite' => \JoomlaPlayground\Database\SqliteDriver::class,
+    'mysqlonsqlite'    => \JoomlaPlayground\Database\MysqlOnSqlite\MysqlOnSqliteDriver::class,
+];
+$driver            = $options['driver'] ?? 'playgroundsqlite';
+
+if (!isset($drivers[$driver])) {
+    fail('Unknown driver ' . $driver . '; use ' . implode(' or ', array_keys($drivers)));
+}
 
 $config = [
-    'db_type'                => 'playgroundsqlite',
+    'db_type'                => $driver,
     'db_host'                => 'localhost',
     // SQLite needs neither, but the Global Configuration form requires a host and a user.
     'db_user'                => 'sqlite',
@@ -84,6 +96,8 @@ $config = [
 step('Copying the overlay into the site');
 copyTree(PLAYGROUND_ROOT . '/overlay', $site);
 copyTree(PLAYGROUND_ROOT . '/src', $site . '/libraries/playground/src');
+copyTree(PLAYGROUND_ROOT . '/vendor/wordpress/mysql-on-sqlite/packages/mysql-on-sqlite/src', $site . '/libraries/playground/mysql-on-sqlite');
+copy(PLAYGROUND_ROOT . '/vendor/wordpress/mysql-on-sqlite/packages/mysql-on-sqlite/LICENSE', $site . '/libraries/playground/mysql-on-sqlite/LICENSE');
 
 $databaseFile = $site . '/' . $config['db_name'];
 
@@ -132,52 +146,76 @@ $db = \Joomla\CMS\Installation\Helper\DatabaseHelper::getDbo(
     $config['db_prefix']
 );
 
-if (!$db instanceof \JoomlaPlayground\Database\SqliteDriver) {
+if (!$db instanceof $drivers[$driver]) {
     fail('The playground database driver was not loaded, got ' . $db::class);
 }
 
 // 3. Tables
-$converter = new \JoomlaPlayground\Schema\PostgresqlToSqliteConverter();
+if ($driver === 'mysqlonsqlite') {
+    // Joomla's own MySQL install SQL, through Joomla's own installation model.
+    $databaseModel = $app->getMVCFactory()->createModel('Database', 'Installation', ['dbo' => $db]);
 
-foreach (['base', 'supports', 'extensions', 'localise', 'custom'] as $schema) {
-    $file = JPATH_INSTALLATION . '/sql/postgresql/' . $schema . '.sql';
+    foreach (['base', 'supports', 'extensions', 'localise', 'custom'] as $schema) {
+        $file = JPATH_INSTALLATION . '/sql/mysql/' . $schema . '.sql';
 
-    if (!is_file($file)) {
-        continue;
-    }
+        if (is_file($file)) {
+            step('Creating tables: ' . $schema . '.sql (MySQL)');
 
-    step('Creating tables: ' . $schema . '.sql');
-    $result = $converter->convert(file_get_contents($file));
+            // WP_MySQL_On_SQLite 3.1.1 stores VARBINARY as BLOB, which never equals a string in SQLite, so the
+            // session table (session_id VARBINARY) would never find its rows. VARCHAR works for session ids.
+            $sql  = preg_replace('/\bvarbinary\((\d+)\)/i', 'varchar($1)', file_get_contents($file));
+            $file = $site . '/tmp/install-' . $schema . '.sql';
+            file_put_contents($file, $sql);
 
-    $db->transactionStart();
-
-    foreach ($result->statements as $statement) {
-        $db->setQuery($statement)->execute();
-    }
-
-    foreach ($result->sequences as $table => $next) {
-        foreach (\JoomlaPlayground\Schema\ConversionResult::sequenceStatements($db->replacePrefix($table), $next) as $statement) {
-            $db->setQuery($statement)->execute();
+            if (!$databaseModel->populateDatabase($db, $file)) {
+                reportMessages($app);
+                fail('Creating the tables failed');
+            }
         }
     }
+} else {
+    $converter = new \JoomlaPlayground\Schema\PostgresqlToSqliteConverter();
 
-    $db->transactionCommit();
+    foreach (['base', 'supports', 'extensions', 'localise', 'custom'] as $schema) {
+        $file = JPATH_INSTALLATION . '/sql/postgresql/' . $schema . '.sql';
+
+        if (!is_file($file)) {
+            continue;
+        }
+
+        step('Creating tables: ' . $schema . '.sql');
+        $result = $converter->convert(file_get_contents($file));
+
+        $db->transactionStart();
+
+        foreach ($result->statements as $statement) {
+            $db->setQuery($statement)->execute();
+        }
+
+        foreach ($result->sequences as $table => $next) {
+            foreach (\JoomlaPlayground\Schema\ConversionResult::sequenceStatements($db->replacePrefix($table), $next) as $statement) {
+                $db->setQuery($statement)->execute();
+            }
+        }
+
+        $db->transactionCommit();
+    }
+
+    // ConfigurationModel::setup() takes the schema version from the newest update file of the server type.
+    // There are no SQLite update files yet: an empty file with the newest PostgreSQL version stands in.
+    $updates = JPATH_ADMINISTRATOR . '/components/com_admin/sql/updates/';
+    $newest  = array_reduce(
+        glob($updates . 'postgresql/*.sql'),
+        static fn (string $carry, string $file): string => version_compare($carry, basename($file, '.sql')) < 0 ? basename($file, '.sql') : $carry,
+        '0'
+    );
+
+    if (!is_dir($updates . 'sqlite')) {
+        mkdir($updates . 'sqlite', 0755, true);
+    }
+
+    file_put_contents($updates . 'sqlite/' . $newest . '.sql', "-- Joomla Playground: SQLite schema equals PostgreSQL schema version $newest.\n");
 }
-
-// ConfigurationModel::setup() takes the schema version from the newest update file of the server type.
-// There are no SQLite update files yet: an empty file with the newest PostgreSQL version stands in.
-$updates = JPATH_ADMINISTRATOR . '/components/com_admin/sql/updates/';
-$newest  = array_reduce(
-    glob($updates . 'postgresql/*.sql'),
-    static fn (string $carry, string $file): string => version_compare($carry, basename($file, '.sql')) < 0 ? basename($file, '.sql') : $carry,
-    '0'
-);
-
-if (!is_dir($updates . 'sqlite')) {
-    mkdir($updates . 'sqlite', 0755, true);
-}
-
-file_put_contents($updates . 'sqlite/' . $newest . '.sql', "-- Joomla Playground: SQLite schema equals PostgreSQL schema version $newest.\n");
 
 // 4. configuration.php, schema version, manifest caches, Super User
 step('Writing configuration.php and creating the Super User');
@@ -262,6 +300,8 @@ function reportMessages(object $app): void
 
 function copyTree(string $source, string $target): void
 {
+    is_dir($target) || mkdir($target, 0755, true);
+
     $items = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($source, FilesystemIterator::SKIP_DOTS),
         RecursiveIteratorIterator::SELF_FIRST

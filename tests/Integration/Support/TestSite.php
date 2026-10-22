@@ -6,7 +6,8 @@ namespace JoomlaPlayground\Tests\Integration\Support;
  * A freshly installed Joomla site on SQLite, served by PHP's built-in web server, shared by all integration tests.
  *
  * The Full Package of JOOMLA_VERSION is downloaded once into .cache/, unpacked into build/test-site and
- * installed with bin/install-sqlite-site.php and a random Super User password.
+ * installed with bin/install-sqlite-site.php and a random Super User password, using the database driver in
+ * JOOMLA_TEST_DRIVER (playgroundsqlite or mysqlonsqlite).
  */
 final class TestSite
 {
@@ -22,6 +23,7 @@ final class TestSite
         public readonly string $url,
         public readonly string $username,
         public readonly string $password,
+        public readonly string $driver,
     ) {
     }
 
@@ -35,6 +37,7 @@ final class TestSite
         $project = \dirname(__DIR__, 3);
         $version = getenv('JOOMLA_VERSION') ?: throw new \RuntimeException('JOOMLA_VERSION is not set');
         $port    = (int) (getenv('JOOMLA_TEST_PORT') ?: 8781);
+        $driver  = getenv('JOOMLA_TEST_DRIVER') ?: 'playgroundsqlite';
         $root    = $project . '/build/test-site';
         $url     = 'http://127.0.0.1:' . $port;
 
@@ -58,14 +61,14 @@ final class TestSite
 
         [$exitCode, $output] = self::run([
             PHP_BINARY, '-d', 'xdebug.mode=off', $project . '/bin/install-sqlite-site.php',
-            '--site=' . $root, '--admin-username=admin', '--admin-password=' . $password, '--live-site=' . $url,
+            '--site=' . $root, '--driver=' . $driver, '--admin-username=admin', '--admin-password=' . $password, '--live-site=' . $url,
         ]);
 
         if ($exitCode !== 0) {
             throw new \RuntimeException("Installing the test site failed:\n" . $output);
         }
 
-        $site = new self($root, $url, 'admin', $password);
+        $site = new self($root, $url, 'admin', $password, $driver);
         $site->startServer($port);
 
         return $site;

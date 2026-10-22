@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<extension type="component" method="upgrade">
+	<name>com_playgroundtest</name>
+	<author>Joomla Playground tests</author>
+	<version>1.0.0</version>
+	<description>Test fixture: a component that ships MySQL-only install SQL, like many third-party extensions.</description>
+	<namespace path="src">JoomlaPlayground\Component\Playgroundtest</namespace>
+	<install>
+		<sql>
+			<file driver="mysql" charset="utf8">sql/install.mysql.utf8.sql</file>
+		</sql>
+	</install>
+	<administration>
+		<files folder="administrator">
+			<folder>services</folder>
+			<folder>sql</folder>
+		</files>
+	</administration>
+</extension>

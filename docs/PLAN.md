@@ -1,6 +1,6 @@
 # Joomla Playground — draft build plan
 
-*Starting point for discussion. Builds on [REPORT.md](REPORT.md). Status 2026-10-22: phase 1 step 1a done (Joomla on SQLite, natively); next are step 1b (MySQL emulation spike) and step 2 (`@php-wasm/node`).*
+*Starting point for discussion. Builds on [REPORT.md](REPORT.md). Status 2026-10-22: phase 1 steps 1a (Joomla on SQLite) and 1b (MySQL emulated on SQLite) done; next is step 2 (`@php-wasm/node`), which also decides the default database driver.*
 
 ## Goal
 
@@ -80,6 +80,19 @@ Left over for later:
 - Try running the **MySQL** install SQL and the same smoke test.
 - **Outcome:** pick A, C, or A for core plus C as a "compat mode" for third-party extensions.
 
+**Done (2026-10-22).** Joomla runs on the emulator (`$dbtype = 'mysqlonsqlite'`) with its MySQL install SQL
+unchanged.
+- **Tests:** the full suite passes on both drivers, and CI runs both. A test component that ships only MySQL
+  SQL works on C, while on A it installs without its tables.
+- **What C needed:**
+  - emulated prepared statements;
+  - workarounds for 6 emulator gaps: `TIME_FORMAT`, `CONCAT_WS`, `SOUNDEX`, `GROUP_CONCAT … SEPARATOR`,
+    `VARBINARY` equality, `SHOW STATUS`.
+- **Cost:** C is 1.3–2.6× slower per page with native PHP (REPORT §10).
+- **Decision postponed to step 2:** measure both drivers in `@php-wasm/node`. If C's overhead in WebAssembly is
+  acceptable, C becomes the default and A the fast fallback.
+- **Follow-up:** report the emulator gaps upstream (WordPress/sqlite-database-integration).
+
 ### Step 2: Joomla in `@php-wasm/node` · *1–2 days*
 
 - A small Node script:
@@ -93,6 +106,10 @@ Left over for later:
   - sessions and cookies through the cookie store;
   - uploads.
 - Run the CLI with `php.cli(['cli/joomla.php', …])`.
+- Run both database drivers (`playgroundsqlite`, `mysqlonsqlite`) and compare page times in WebAssembly, so the
+  default driver can be chosen (see step 1b).
+- Set `live_site`: if php-wasm reports a SAPI name containing "cli", Joomla's `Uri::base()` takes the CLI
+  branch, as it does with `php -S`.
 
 ### Step 3: Joomla in the browser · *3–5 days*
 

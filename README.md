@@ -3,8 +3,8 @@
 Joomla running entirely in the browser, comparable to [WordPress Playground](https://wordpress.org/playground/):
 PHP compiled to WebAssembly, no server, no account, a disposable site in a browser tab.
 
-**Status: proof of concept, step 1a.** Joomla 6.2 runs on SQLite with native PHP. The browser part does
-not exist yet. See the [exploration report](docs/REPORT.md) and the [plan](docs/PLAN.md).
+**Status: proof of concept, steps 1a and 1b.** Joomla 6.2 runs on SQLite with native PHP, with either of two
+database drivers. The browser part does not exist yet. See the [exploration report](docs/REPORT.md) and the [plan](docs/PLAN.md).
 
 ## Why SQLite first
 
@@ -12,16 +12,25 @@ In the browser, PHP (php-wasm) has SQLite but no MySQL or PostgreSQL server. Joo
 PostgreSQL, so the first question is whether Joomla can run on SQLite at all. That question does not need
 WebAssembly. Native PHP with `pdo_sqlite` runs the same code, so this step answers it on the desktop.
 
-It needs no changes to Joomla core:
+There are two database drivers, both without changes to Joomla core:
+
+- **`playgroundsqlite`**: Joomla's PostgreSQL schema, converted to SQLite. It is fast and behaves like
+  PostgreSQL.
+- **`mysqlonsqlite`** (spike): Joomla's MySQL schema as it is, on WordPress's
+  [MySQL emulation for SQLite](https://github.com/WordPress/sqlite-database-integration). It behaves like MySQL
+  and runs third-party MySQL install SQL, but is slower.
+
+See [REPORT §10](docs/REPORT.md) for the comparison.
 
 | Part | What it does |
 |---|---|
 | [`src/Database/SqliteDriver.php`](src/Database/SqliteDriver.php) | Driver for `$dbtype = 'playgroundsqlite'`, built on the Joomla Framework's SQLite driver |
 | [`src/Database/SqliteQuery.php`](src/Database/SqliteQuery.php) | Query builder fixes: dates, `RANDOM()`, `REGEXP`, casts, `UPDATE … FROM`, window functions |
 | [`src/Database/SqliteFunctions.php`](src/Database/SqliteFunctions.php) | PHP versions of SQL functions SQLite lacks (`REGEXP`, `CONCAT`, `SOUNDEX`, …) |
+| [`src/Database/MysqlOnSqlite/`](src/Database/MysqlOnSqlite) | Driver for `$dbtype = 'mysqlonsqlite'`: Joomla's MySQL driver on `WP_MySQL_On_SQLite`, with emulated prepared statements |
 | [`src/Schema/PostgresqlToSqliteConverter.php`](src/Schema/PostgresqlToSqliteConverter.php) | Converts Joomla's PostgreSQL install SQL to SQLite |
 | [`overlay/`](overlay) | Files copied into the site: `defines.php` hooks that register the autoloader |
-| [`extensions/plg_system_playground`](extensions/plg_system_playground) | System plugin; for now it makes Global Configuration offer the SQLite driver |
+| [`extensions/plg_system_playground`](extensions/plg_system_playground) | System plugin; for now it makes Global Configuration offer the playground database driver |
 | [`bin/install-sqlite-site.php`](bin/install-sqlite-site.php) | Installs a Joomla Full Package on SQLite, using Joomla's own installation models |
 
 ## Try it
@@ -34,7 +43,7 @@ composer install
 ```
 
 ```bash
-php bin/install-sqlite-site.php --site=joomla --admin-password=<your password> --live-site=http://127.0.0.1:8080
+php bin/install-sqlite-site.php --site=joomla --driver=playgroundsqlite --admin-password=<your password> --live-site=http://127.0.0.1:8080
 ```
 
 ```bash
@@ -62,7 +71,8 @@ composer test
   - Global Configuration;
   - the scheduler and the CLI.
 
-  The site is installed from the release set by `JOOMLA_VERSION` in `phpunit.xml.dist`, downloaded once into
+  `JOOMLA_TEST_DRIVER` (`playgroundsqlite` or `mysqlonsqlite`) chooses the database driver. The site is
+  installed from the release set by `JOOMLA_VERSION` in `phpunit.xml.dist`, downloaded once into
   `.cache/`.
 
 ## Documents

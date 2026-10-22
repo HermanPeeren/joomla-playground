@@ -4,8 +4,27 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6b7f0582711ca0bec13f9c320dab0f78",
-    "packages": [],
+    "content-hash": "d545dc806b732471b1bd01554d425bdf",
+    "packages": [
+        {
+            "name": "wordpress/mysql-on-sqlite",
+            "version": "3.1.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/WordPress/sqlite-database-integration.git",
+                "reference": "v3.1.1"
+            },
+            "type": "library",
+            "autoload": {
+                "files": [
+                    "packages/mysql-on-sqlite/src/load.php"
+                ]
+            },
+            "license": [
+                "GPL-2.0-or-later"
+            ]
+        }
+    ],
     "packages-dev": [
         {
             "name": "joomla/database",

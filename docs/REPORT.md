@@ -33,6 +33,9 @@ already been done by the WordPress Playground team and can be reused.
   the desktop before touching WASM. See [PLAN.md](PLAN.md).
 - **Update, 2026-10-22: step 1a is done.** Joomla 6.2.0 runs on SQLite with native PHP and no core changes,
   covered by 112 automated tests. See §9.
+- **Update, 2026-10-22: step 1b is done.** Joomla also runs on WordPress's MySQL emulation for SQLite (Option C),
+  with Joomla's MySQL SQL unchanged. Third-party MySQL-only extension SQL works there, and comparisons follow
+  MySQL. It is slower and needed workarounds for 6 emulator gaps. See §10.
 
 ## 2. How WordPress Playground works, and what is reusable
 
@@ -333,7 +336,77 @@ with `php -S` and exercise it over HTTP:
   later Joomla version is not supported. Not needed for a playground.
 - Not yet tested: multilingual sites, workflows enabled, banners with keywords, the Web Services API.
 
-## 10. Sources
+## 10. Step 1b result: MySQL emulated on SQLite (2026-10-22)
+
+The second database strategy (Option C) also works. Joomla 6.2.0 runs on WordPress's MySQL emulation for SQLite
+(`wordpress/mysql-on-sqlite` 3.1.1, `WP_MySQL_On_SQLite`), with no Joomla core changes.
+- **Setup:** `$dbtype = 'mysqlonsqlite'` loads `MysqlOnSqliteDriver`, a subclass of Joomla's own
+  `Joomla\Database\Mysql\MysqlDriver`.
+- **Joomla sees MySQL:** server type `mysql`, MySQL code paths, and **its MySQL install SQL as it is**, run
+  through Joomla's own `DatabaseModel::populateDatabase()`.
+- **No conversion needed:** no schema converter, no sequence handling, no placeholder update files. The MySQL
+  update SQL exists, so the Database check works normally.
+- **Same test suite:** the installer (`--driver=mysqlonsqlite`) and the whole test suite run with either driver.
+  CI runs both.
+
+**What the driver adds**
+- **Emulated prepared statements.** The emulator has no `prepare()` or parameter binding yet, and Joomla
+  prepares every query. `EmulatedPreparedStatement` inlines bound values, quoted by the emulator with MySQL's
+  escaping rules, outside string literals, quoted identifiers and comments. This is how PDO's
+  `ATTR_EMULATE_PREPARES` works too, and Joomla's MySQL driver turns that on as well.
+- **Workarounds for gaps in the emulator 3.1.1.** Each one is worth reporting upstream:
+
+| Gap | Hit by | Workaround |
+|---|---|---|
+| `TIME_FORMAT()` not supported | install SQL (scheduler tasks) | PHP function on the SQLite connection |
+| `CONCAT_WS()` missing (SQLite < 3.44) | saving articles and categories | PHP function |
+| `SOUNDEX()` missing | Smart Search indexing on save | PHP function |
+| `GROUP_CONCAT(… SEPARATOR …)` / `ORDER BY` passed to SQLite untranslated | CLI `user:list` | Query builder leaves out the default `SEPARATOR ','` |
+| `VARBINARY` is stored as BLOB and never equals a string, so `WHERE session_id = '…'` finds nothing | **every login** (`#__session.session_id`) | Installer maps `varbinary(n)` to `varchar(n)` |
+| `COLLATE utf8mb4_bin` columns still compare case-insensitively | (not hit in core so far) | none |
+| `SHOW SESSION STATUS` not supported | System Information | Driver reports no TLS |
+| `rowCount()` is 0 for SELECT (as with PDO SQLite) | grouped list counts | Same `getNumRows()` fix as the SQLite driver |
+
+**Comparison.** Same machine, PHP 8.3 with `php -S`, median of 8 requests.
+
+| | playgroundsqlite (A) | mysqlonsqlite (C) |
+|---|---|---|
+| Install from the Full Package | 6.1 s | 6.7 s |
+| Database size after install | 1.6 MB | 2.0 MB |
+| Site home / category page | 48 / 52 ms | 64 / 136 ms |
+| Admin dashboard / articles / menu items | 79 / 58 / 67 ms | 129 / 107 / 148 ms |
+| Admin extensions list | 492 ms | 793 ms |
+| Extra code | converter + driver | driver + emulator (~870 KB PHP) |
+| Semantics | PostgreSQL: case-sensitive (`ADMIN` cannot log in as `admin`) | MySQL: case-insensitive (`ADMIN` logs in) |
+| Extension with MySQL-only install SQL | installs "successfully" **without its tables** | works |
+| Per Joomla release | re-run the converter; there is no SQLite update SQL | nothing: Joomla's MySQL SQL is used as it is |
+| Maturity | our code, 112 tests | emulator is built for WordPress; Joomla's SQL found 6 gaps in a day |
+
+All of these are covered by tests:
+- **Unit:** 54 tests, including 14 for the emulator driver and the placeholder inlining.
+- **Integration:** 73 tests per driver, including `ExtensionSqlTest`, which installs a component that ships only
+  MySQL SQL.
+
+**Assessment**
+- **C is the better fit for a playground** that should also demo extensions:
+  - real MySQL semantics, which is what Joomla and extension developers test against;
+  - extension SQL works;
+  - no schema conversion to maintain.
+- **Its costs:**
+  - pages are 1.3–2.6× slower natively, because every query goes through a PHP lexer and parser, and under
+    WebAssembly this will be slower still;
+  - the gaps found, which upstream fixes would solve (the project is active, with 3 releases in October 2026).
+- **A is faster and simpler, but:**
+  - it needs a translation step for extension SQL;
+  - it behaves like PostgreSQL.
+
+**Recommendation**
+- Keep both drivers behind the same installer.
+- Decide in step 2 (`@php-wasm/node`), where the emulator's overhead can be measured in WebAssembly.
+- If that overhead is acceptable, make C the default and keep A as the fast fallback.
+- Report the gaps to WordPress/sqlite-database-integration.
+
+## 11. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)
