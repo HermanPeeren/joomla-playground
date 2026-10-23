@@ -930,12 +930,42 @@ is patched (`patches` in `assets.json`), or the blueprint works around them:
 | The workflow transitions refer to a stage "Published"; the stage is called "Article published!" | PHP warnings, transitions without a stage | Not fixed; the demo does not use the workflows |
 | No language string `PLG_DEMODATA_USER_STEP_FAILED` | Error messages show the key only | Not fixed |
 
-**Measured:** ready in about 90 s (headless Chrome, local server): 2.7 s for the playground, then the blueprint.
-Most of it is the demonstration data's 16 steps. A prebuilt export would start in a few seconds; that is the
-next step (see the plan).
+**Measured** on the public playground (headless Chrome), from opening the link: ready after 84–98 s. One run:
+
+| Part | Time |
+|---|---|
+| The playground: service worker, PHP, Joomla downloaded and unpacked, login | 7.4 s |
+| Four language packs, about 1.5 s each | 6.1 s |
+| Language filter, switcher, the module and the plugin, their options, the user group | 4.0 s |
+| The demonstration data, 16 steps | 80.3 s |
+| The article | 1.8 s |
+| **Ready** | **97.7 s** |
+
+Four steps of the demonstration data took most of it: articles 33.5 s, categories 17.4 s, menu items 7.2 s, tags
+6.5 s.
+
+**Faster: Smart Search later.** Every saved article, category, tag and contact is also indexed by Smart Search,
+through its content plugin, at about 0.23 s per item in the playground. The blueprint now switches that plugin off
+for the demonstration data (`disableExtension`) and builds the index afterwards (`indexSmartSearch`, like
+Smart Search's Index button). That step has `"background": true`: it runs after the playground is ready, while
+the visitor already looks around.
+- Without the indexing, the demonstration data takes 35 s instead of 80 s (articles 7.7 s, categories 4.2 s,
+  tags 0.8 s). The playground is ready after about 45 s (42.6–53.1 s in four local runs).
+- The index (247 items) is built in about 55 s after that. The toolbar shows the progress ("Smart Search index:
+  110 of 247 items"); search then finds the demo articles.
+- Meanwhile a page waits for the batch that is running. With Smart Search's batch size at 5 (set by the
+  blueprint), a page took 1.6 s (median) and at most 3.0 s; with 10, 2.9 s and 5.6 s.
+- **Found and fixed:** at first, a page request waited until the whole index was built. When a background request
+  finished, the next one joined the request queue at once, before the worker handled the page's request (a
+  message from the service worker). A short pause (20 ms) before each background request lets the page's
+  requests in first.
+
+A prebuilt export would start in a few seconds, with the index already built; that is the next step (see the
+plan).
 
 **Tests:** the browser suite (19 tests) runs the whole demo and checks the home page of each of the five
-languages: its language, the explanation article, the language switcher and the heritage articles.
+languages: its language, the explanation article, the language switcher and the heritage articles. It waits for
+the Smart Search index in the background and searches for a heritage article.
 
 ## 25. Sources
 

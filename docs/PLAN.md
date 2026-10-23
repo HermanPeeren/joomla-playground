@@ -195,8 +195,8 @@ pitch to the Joomla production department.
 
 ## Demos
 
-- **Multilingual demo** (`?blueprint=heritage-demo`, REPORT §24). **Done (2026-10-23)** as a blueprint; it takes
-  about 90 s to set up.
+- **Multilingual demo** (`?blueprint=heritage-demo`, REPORT §24). **Done (2026-10-23)** as a blueprint. It is
+  ready after about 45 s; the Smart Search index follows in the background in about a minute.
 - **Next: a prebuilt export.** CI runs the blueprint in headless Chrome, exports the site, and publishes the
   zip; `?demo=heritage` (or the blueprint itself) then starts from it in seconds. Rebuild it when its sources
   change: the Joomla versions (daily workflow), the demo data repositories (a scheduled check of their latest

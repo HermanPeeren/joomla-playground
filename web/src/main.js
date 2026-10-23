@@ -41,6 +41,8 @@ const elements = {
 
 let worker = null;
 let playground = null;
+let readyStatus = '';
+let backgroundStatus = null;
 
 /** The Joomla bundles of this playground: { default: '6.2.0', versions: [manifest, ...] } (joomla/versions.json). */
 let bundles = null;
@@ -87,10 +89,16 @@ function startWorker() {
   worker = new Worker(new URL('./php-worker.js', import.meta.url), { type: 'module' });
   mails = [];
   selectedMail = null;
+  readyStatus = '';
+  backgroundStatus = null;
   renderMails();
   worker.onmessage = ({ data }) => {
     if (data.type === 'progress') {
       setStatus(data.message);
+    } else if (data.type === 'background') {
+      // A blueprint step that runs after the playground is ready (its first messages may come before show()).
+      backgroundStatus = data.message;
+      readyStatus && setStatus(backgroundStatus ? `${readyStatus} · ${backgroundStatus}` : readyStatus);
     } else if (data.type === 'mail') {
       mails.unshift({ ...parseMail(data.mail.raw), received: data.mail.received });
       renderMails();
@@ -136,7 +144,8 @@ function show(path = '/administrator/') {
   const seconds = (playground.timings.ready / 1000).toFixed(1);
   const where = playground.site ? `saved as "${playground.site}"` : 'temporary';
 
-  setStatus(`Ready in ${seconds} s (${where})`);
+  readyStatus = `Ready in ${seconds} s (${where})`;
+  setStatus(backgroundStatus ? `${readyStatus} · ${backgroundStatus}` : readyStatus);
   elements.credentials.textContent = `${playground.username} / ${playground.password}`;
   elements.info.textContent = `Joomla ${playground.manifest.joomla} · ${playground.manifest.driver}`;
   elements.php.value = playground.phpVersion;
