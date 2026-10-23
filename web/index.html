@@ -178,11 +178,36 @@
       #mail-list { border-right: 0; border-bottom: 1px solid #ddd; }
     }
 
+    #stage {
+      position: relative;
+      flex: 1;
+      display: flex;
+    }
+
     iframe {
       flex: 1;
       width: 100%;
       border: 0;
     }
+
+    /* While a playground starts: Joomla's own loader (joomla-core-loader) and what is happening. */
+    #loading {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      background: #f2f5fa;
+      color: #1c2b4a;
+      font-size: 16px;
+    }
+
+    #loading[hidden] { display: none; }
+    #loading.error #loading-status { color: #a51d2d; }
+    #loading.error joomla-core-loader { display: none; }
   </style>
 </head>
 <body>
@@ -209,7 +234,13 @@
     <label class="version">PHP <select id="php-version" disabled title="PHP version (WebAssembly)"></select></label>
     <span id="info"></span>
   </header>
-  <iframe id="joomla" title="Joomla"></iframe>
+  <div id="stage">
+    <iframe id="joomla" title="Joomla"></iframe>
+    <div id="loading" role="status" aria-live="polite">
+      <joomla-core-loader inline size="160" color="transparent"></joomla-core-loader>
+      <p id="loading-status">Loading</p>
+    </div>
+  </div>
   <dialog id="mail-dialog">
     <header>
       <h1>Mail sent by this playground</h1>

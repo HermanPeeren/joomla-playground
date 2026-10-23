@@ -93,6 +93,10 @@ foreach ($list['versions'] as $version) {
 
 file_put_contents($out . '/versions.json', json_encode(['default' => $list['default'], 'versions' => $manifests], JSON_PRETTY_PRINT) . "\n");
 
+// Joomla's loader, which the page shows while a playground starts (before it knows which bundle it will use).
+copy($out . '/' . $list['default'] . '/media/system/js/joomla-core-loader.min.js', $out . '/joomla-core-loader.js')
+    || fail('No joomla-core-loader.min.js in the bundle of Joomla ' . $list['default']);
+
 echo "== Files of the playground's blueprints\n";
 $process = proc_open([PHP_BINARY, __DIR__ . '/download-blueprint-assets.php'], [1 => STDOUT, 2 => STDERR], $pipes);
 proc_close($process) === 0 || fail('Downloading the files of the blueprints failed');
