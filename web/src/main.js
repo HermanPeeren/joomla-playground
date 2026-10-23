@@ -10,7 +10,8 @@ import { parseMail } from './mail.js';
 
 const base = new URL('./', location.href);
 
-// A CORS proxy for downloads of blueprints, set at build time: VITE_CORS_PROXY=https://proxy.example.org/?url=
+// A CORS proxy (proxy/cors-proxy.js) for downloads from hosts without CORS headers, by blueprints and by PHP itself;
+// set at build time: VITE_CORS_PROXY=https://joomla-playground-cors-proxy.example.workers.dev/
 const corsProxy = import.meta.env.VITE_CORS_PROXY || null;
 
 const elements = {

@@ -24,7 +24,7 @@ export class BlueprintError extends Error {}
  * @param {Function} context.runPhp    (code) => PHPResponse; throws on errors
  * @param {Function} context.progress  (message) => void
  * @param {string}   context.baseUrl   URL the step URLs are relative to
- * @param {string}   [context.corsProxy] URL prefix of a CORS proxy
+ * @param {string}   [context.corsProxy] URL of a CORS proxy (proxy/cors-proxy.js)
  */
 export async function runSteps(steps, context) {
   for (const [index, step] of steps.entries()) {
@@ -259,7 +259,7 @@ export async function download(url, { baseUrl, corsProxy = null, progress = () =
       throw new Error(`Cannot download ${absolute}: the host does not allow it (CORS), and no CORS proxy is set up`);
     }
 
-    response = await fetch(corsProxy + encodeURIComponent(absolute));
+    response = await fetch(`${corsProxy}?url=${encodeURIComponent(absolute)}`);
   }
 
   if (!response.ok) {

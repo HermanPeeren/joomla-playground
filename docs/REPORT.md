@@ -778,7 +778,7 @@ requests from another website.
     instead.
   - Installing language packs from the list needs a CORS proxy. `tcpOverFetch` takes a `corsProxyUrl`, but it
     appends the raw URL to it and expects an `X-Playground-Cors-Proxy` response header; the proxy of §16 takes
-    `?url=<encoded URL>`. Connecting the two is not done yet.
+    `?url=<encoded URL>`. Connecting the two: see §20.
 - The update quickicons, the update notification task and the web installer stay disabled in the bundle, as
   before. Whether they work over fetch() is untested.
 
@@ -807,7 +807,36 @@ The playground now has a bundle per Joomla version: 6.2.0 (the default) and 5.4.
   starts, because a service worker from before a deploy would not know the new URLs.
 - **Tests** (17 in all): `?joomla=5.4` starts Joomla 5.4.10 with its own media files; `?joomla=3` gives an error.
 
-## 20. Sources
+## 20. Phase 2, part 7: PHP's own downloads through the CORS proxy (2026-10-23)
+
+PHP's HTTP requests go through `fetch()` (§18), so they meet the same CORS rules as blueprint downloads. They now
+use the same proxy, when the playground has one.
+- **`tcpOverFetch` and the proxy:** `@php-wasm` first tries `fetch()` directly, then `<proxy URL><request URL>`,
+  with the URL appended as it is. It accepts the answer only with an `X-Playground-Cors-Proxy` header. The proxy now
+  takes both forms (`?url=<encoded URL>` and the appended URL), and every answer carries that header. It also
+  exposes it to the page.
+- **Joomla's S3 bucket:** downloads.joomla.org redirects language packs to a signed URL on
+  `s3-us-west-2.amazonaws.com`. The proxy allows that host only below `/joomla-official-downloads/`, so it does
+  not relay arbitrary S3 files. Allow-list entries can now be "host/path".
+- **Content-Disposition:** Joomla's installer names a download after its `Content-Disposition` header. The
+  browser hides that header from a cross-origin response unless it is exposed. Without it, the language pack was
+  saved as `…-zip?format=zip` and Joomla could not unpack it ("Unable to detect manifest file"). The proxy now
+  exposes it, and `ETag` and `Last-Modified`.
+- The playground's notice on Install Languages ("language packs cannot be installed from this list") is only
+  shown when the playground has no proxy.
+- `npm run proxy:dev` runs the proxy locally with Node, for development.
+
+**Verified end to end** (local proxy, headless Chrome): System > Install Languages > Dutch installs the language
+pack in about 4 s ("Installation of the language pack was successful"). PHP received the zip byte for byte
+(same MD5 as a direct download).
+
+**Tests:** proxy unit tests (9) for the appended URL form, the header, the exposed headers and host/path entries.
+The browser suite does not use the internet, so the end-to-end check is not in CI.
+
+**Not done:** deploying the proxy (needs a Cloudflare account). Until then, the public playground cannot install
+language packs from Install Languages.
+
+## 21. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)

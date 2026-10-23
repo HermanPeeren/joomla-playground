@@ -180,7 +180,8 @@ pitch to the Joomla production department.
 - **CORS proxy:** a Cloudflare Worker or the reusable `php-cors-proxy`, with an allow-list
   (downloads.joomla.org, update.joomla.org, GitHub releases, JED download hosts) and rate limits.
   - **Written (2026-10-22)** (REPORT §16): `proxy/cors-proxy.js`, a Cloudflare Worker with tests; blueprints use
-    it when the build sets `VITE_CORS_PROXY`. Next: deploy it (needs a Cloudflare account).
+    it when the build sets `VITE_CORS_PROXY`; since part 7 (REPORT §20) PHP's own downloads do too, e.g. Install
+    Languages. Next: deploy it (needs a Cloudflare account).
 - **Mail capture:** an in-app inbox showing the mails Joomla tries to send.
   - **Done (2026-10-22)** (REPORT §15): PHP's sendmail is caught by the worker and shown under Mail.
 - **Build pipeline in CI:** build bundles for each supported Joomla version on release.
