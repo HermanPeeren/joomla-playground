@@ -186,8 +186,8 @@ pitch to the Joomla production department.
   - **Done (2026-10-22)** (REPORT §15): PHP's sendmail is caught by the worker and shown under Mail.
 - **Build pipeline in CI:** build bundles for each supported Joomla version on release.
   - **Done (2026-10-22)** (REPORT §19): bundles of 6.2.0 and 5.4.10 from `joomla-versions.json`, built by CI and
-    the Pages workflow. Next: update the list automatically on a Joomla release (a scheduled workflow that
-    opens a pull request), and nightly builds.
+    the Pages workflow. A daily workflow proposes updates of the list after Joomla releases (REPORT §21).
+    Next: nightly builds.
 - **UI:** a simple toolbar (version picker, reset, export, open admin).
   - **Done (2026-10-22)** (REPORT §17): PHP version picker, Start over; Export and Site/Administrator were
     already there. The Joomla version picker came with part 6.

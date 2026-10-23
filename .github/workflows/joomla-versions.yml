@@ -1,0 +1,70 @@
+name: Joomla versions
+
+# Every day: are there newer stable Joomla releases than the playground offers (joomla-versions.json)? Then this
+# workflow pushes a branch with the update (scripts/update-joomla-versions.mjs) and opens a pull request for it.
+#
+# Opening the pull request needs Settings > Actions > General > "Allow GitHub Actions to create and approve pull
+# requests". Without it, the workflow opens an issue with a link to compare the branch instead. Pull requests
+# opened by the workflow's token do not start the CI workflow by themselves: close and reopen the pull request,
+# or push to its branch, to run it. After merging, run "Deploy the playground" to publish the new bundles.
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Look for new Joomla releases
+        id: update
+        run: |
+          node scripts/update-joomla-versions.mjs | tee update.log
+          echo "changed=$(sed -n 's/^changed=//p' update.log)" >> "$GITHUB_OUTPUT"
+          echo "summary=$(tail -n 1 update.log)" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push a branch and open a pull request
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          versions=$(node -p "require('./joomla-versions.json').versions.join(', ')")
+          branch="joomla-versions/$(node -p "require('./joomla-versions.json').versions.join('_')")"
+
+          if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
+            echo "The branch $branch exists already"
+            exit 0
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          git commit -am "Joomla versions: $versions"
+          git push origin "$branch"
+
+          body="$SUMMARY
+
+          Found by the Joomla versions workflow (scripts/update-joomla-versions.mjs). The integration tests now install the default version.
+
+          After merging, run the \"Deploy the playground\" workflow to publish the new bundles."
+
+          gh pr create --base main --head "$branch" --title "Joomla versions: $versions" --body "$body" \
+            || gh issue create --title "New Joomla releases: $versions" \
+                 --body "$body
+
+          The workflow may not open pull requests: compare the branch at $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$branch"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUMMARY: ${{ steps.update.outputs.summary }}
