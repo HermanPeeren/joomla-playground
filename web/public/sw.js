@@ -1,8 +1,9 @@
 // Service worker of the Joomla Playground.
 //
-// Requests from the Joomla iframe go to a URL like <playground>/scope-<id>/administrator/. This worker answers
-// them: media/ files come from the static bundle (joomla/media/), everything else is sent over a
-// BroadcastChannel to the PHP worker of the tab that owns the scope, which runs Joomla.
+// Requests from the Joomla iframe go to a URL like <playground>/scope-<id>-6-2-0/administrator/: the tab's scope,
+// which ends with the Joomla version of its bundle. This worker answers them: media/ files come from that static
+// bundle (joomla/6.2.0/media/), everything else is sent over a BroadcastChannel to the PHP worker of the tab that
+// owns the scope, which runs Joomla.
 
 const channel = new BroadcastChannel('joomla-playground');
 const pending = new Map();
@@ -26,16 +27,16 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  const match = url.pathname.substring(base.pathname.length).match(/^(scope-[a-z0-9]+)(\/.*)?$/);
+  const match = url.pathname.substring(base.pathname.length).match(/^(scope-[a-z0-9]+-(\d+)-(\d+)-(\d+))(\/.*)?$/);
 
   if (!match) {
     return;
   }
 
-  const [, scope, path = '/'] = match;
+  const [, scope, major, minor, patch, path = '/'] = match;
 
   if (path.startsWith('/media/')) {
-    event.respondWith(fetch(new URL('joomla' + path + url.search, base)));
+    event.respondWith(fetch(new URL(`joomla/${major}.${minor}.${patch}${path}${url.search}`, base)));
 
     return;
   }

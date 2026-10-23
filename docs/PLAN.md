@@ -170,7 +170,7 @@ pitch to the Joomla production department.
   - `?extension=<url to zip>`
   - `?url=/administrator/…` (landing page)
   - **Done (2026-10-22)** (REPORT §14): `php`, `url`, `login`, `extension`, `language` (an installed language),
-    `blueprint-url`. Next: `joomla` needs bundles of more versions (see the build pipeline).
+    `blueprint-url`; `joomla` since part 6 (REPORT §19).
 - **Blueprint v0** (JSON in the URL fragment or `?blueprint-url=`). Steps:
   - `installExtension`, `enableExtension`, `login`, `setGlobalConfig`, `runPHP`, `runSql`, `writeFile`,
     `unzip`, `importSampleData`, `setSiteLanguage`.
@@ -184,9 +184,12 @@ pitch to the Joomla production department.
 - **Mail capture:** an in-app inbox showing the mails Joomla tries to send.
   - **Done (2026-10-22)** (REPORT §15): PHP's sendmail is caught by the worker and shown under Mail.
 - **Build pipeline in CI:** build bundles for each supported Joomla version on release.
+  - **Done (2026-10-22)** (REPORT §19): bundles of 6.2.0 and 5.4.10 from `joomla-versions.json`, built by CI and
+    the Pages workflow. Next: update the list automatically on a Joomla release (a scheduled workflow that
+    opens a pull request), and nightly builds.
 - **UI:** a simple toolbar (version picker, reset, export, open admin).
   - **Done (2026-10-22)** (REPORT §17): PHP version picker, Start over; Export and Site/Administrator were
-    already there. A Joomla version picker waits for bundles of more versions.
+    already there. The Joomla version picker came with part 6.
 
 ## Phase 3: ecosystem (later)
 

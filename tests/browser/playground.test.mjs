@@ -6,7 +6,7 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
@@ -23,7 +23,7 @@ let playground;
 
 describe('Joomla Playground in the browser', () => {
   before(async () => {
-    assert.ok(existsSync(`${root}/web/dist/joomla/site.zip`), 'Build first: npm run bundle && npm run web:build');
+    assert.ok(existsSync(`${root}/web/dist/joomla/versions.json`), 'Build first: npm run bundle && npm run web:build');
 
     // An extension package for the blueprint test, served next to the playground.
     mkdirSync(`${root}/web/dist/test-fixtures`, { recursive: true });
@@ -73,7 +73,7 @@ describe('Joomla Playground in the browser', () => {
     // would, so the following tests can navigate.
     await frame.click('text=Hide Forever', { timeout: 30000 });
     await frame.waitForSelector('text=Hide Forever', { state: 'detached', timeout: 30000 });
-    assert.match(playground.siteUrl, /\/scope-[a-z0-9]+$/);
+    assert.match(playground.siteUrl, /\/scope-[a-z0-9]+-\d+-\d+-\d+$/);
     assert.equal(playground.manifest.driver, 'mysqlonsqlite');
     console.log('boot timings (ms):', JSON.stringify(playground.timings));
   });
@@ -411,6 +411,48 @@ describe('Blueprints', () => {
     assert.equal(third.phpVersion, '8.5');
     assert.notEqual(third.siteUrl, second.siteUrl);
     await tab.close();
+  });
+
+  test('starts another Joomla version, with its own media files', async () => {
+    const versions = JSON.parse(readFileSync(`${root}/web/dist/joomla/versions.json`, 'utf8'));
+    const other = versions.versions.find((bundle) => bundle.joomla !== versions.default);
+
+    if (!other) {
+      return;
+    }
+
+    const major = other.joomla.split('.').slice(0, 2).join('.');
+    const tab = await context.newPage();
+
+    await tab.goto(`${appUrl}?joomla=${major}`);
+
+    const result = await waitForPlayground(tab);
+
+    assert.equal(result.manifest.joomla, other.joomla);
+    assert.equal(await tab.inputValue('#joomla-version'), other.joomla);
+    assert.match(result.siteUrl, new RegExp(`-${other.joomla.replaceAll('.', '-')}$`));
+
+    const frame = await (await tab.waitForSelector('#joomla')).contentFrame();
+
+    await frame.waitForFunction(() => document.querySelector('link[rel="stylesheet"][href*="/media/"]'), null, { timeout: 60000 });
+
+    const stylesheet = await frame.evaluate(async () => {
+      const href = document.querySelector('link[rel="stylesheet"][href*="/media/"]').href;
+      const response = await fetch(href);
+
+      return { href, status: response.status, type: response.headers.get('content-type') };
+    });
+
+    assert.equal(stylesheet.status, 200, stylesheet.href);
+    assert.match(stylesheet.type, /text\/css/);
+    await tab.close();
+
+    const missing = await context.newPage();
+
+    await missing.goto(`${appUrl}?joomla=3`);
+    await missing.waitForSelector('#status.error', { timeout: 60000 });
+    assert.match(await missing.locator('#status').textContent(), /Joomla 3 is not available/);
+    await missing.close();
   });
 
   test('reports a wrong blueprint', async () => {

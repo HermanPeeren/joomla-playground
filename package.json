@@ -8,7 +8,7 @@
     "docs:pdf": "node scripts/build-docs.mjs",
     "wasm:serve": "node wasm/serve.mjs",
     "wasm:cli": "node wasm/cli.mjs",
-    "bundle": "php bin/build-browser-bundle.php",
+    "bundle": "php bin/build-browser-bundles.php",
     "web:dev": "vite --config web/vite.config.js",
     "web:build": "vite build --config web/vite.config.js",
     "web:preview": "vite preview --config web/vite.config.js --port 5401",

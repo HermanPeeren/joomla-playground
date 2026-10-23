@@ -787,7 +787,27 @@ requests from another website.
   a request that is answered;
 - the Blog Sample Data, with valid JSON from every step.
 
-## 19. Sources
+## 19. Phase 2, part 6: more Joomla versions (2026-10-22)
+
+The playground now has a bundle per Joomla version: 6.2.0 (the default) and 5.4.10.
+- `joomla-versions.json` lists the versions; `npm run bundle` builds one bundle each into
+  `joomla/<version>/` (site.zip, media/, manifest.json), plus `joomla/versions.json`. It downloads missing Full
+  Packages from the GitHub releases. The CI browser job and the Pages workflow use the same command.
+- **Joomla 5.4 needed no changes:** it installs and runs with both database drivers as they are. Its bundle is
+  18.4 MB (6.2: 17.8 MB), with 26.8 MB of media files.
+- **Choosing a version:** `?joomla=5.4` (or `5`, or `5.4.10`) and a blueprint's `preferredVersions.joomla` pick the
+  newest matching bundle; an unknown version gives an error. The toolbar has a Joomla version picker.
+- **Saved sites** keep the version they were made with: their base zip is in OPFS, and `meta.json` says which
+  bundle's media files they use. If that bundle is no longer deployed, the site still opens, with a warning, and
+  gets the default version's media files.
+- **Import** reads the Joomla version from the export's zip comment in the page and starts the matching bundle,
+  so an imported Joomla 5.4 site gets Joomla 5.4's media files.
+- **Media files:** each tab's scope now ends with its Joomla version, e.g. `scope-abc123-5-4-10`. The service
+  worker serves `media/` from that version's bundle. The page waits for the newest service worker before it
+  starts, because a service worker from before a deploy would not know the new URLs.
+- **Tests** (17 in all): `?joomla=5.4` starts Joomla 5.4.10 with its own media files; `?joomla=3` gives an error.
+
+## 20. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)
