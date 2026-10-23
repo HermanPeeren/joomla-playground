@@ -119,8 +119,12 @@ async function boot({ base, scope, joomla, site = null, title = null, zip = null
     siteFiles({ bundle: new URL(`joomla/${joomla}/`, base), site, meta, zip }).then((files) => (lap(meta ? 'read' : 'download'), files)),
   ]);
 
+  const password = meta?.password ?? randomPassword();
+
+  // php.ini settings, before PHP runs anything.
   await enableNetwork(php, caRoot);
-  await prependFile(php, new URL(siteUrl).pathname, Boolean(corsProxy));
+  await prependFile(php, { sitePath: new URL(siteUrl).pathname, hasCorsProxy: Boolean(corsProxy), password });
+  await setPhpIniEntries(php, { sendmail_path: '/usr/sbin/sendmail -t -i' });
 
   progress(meta ? 'Opening the saved site' : 'Unpacking Joomla');
   php.mkdir(DOCUMENT_ROOT);
@@ -153,11 +157,9 @@ async function boot({ base, scope, joomla, site = null, title = null, zip = null
   // From here on, note every path below the document root that changes: those go into the snapshots.
   journalFSEvents(php, DOCUMENT_ROOT, (entry) => trackChange(changes, entry));
 
-  const password = meta?.password ?? randomPassword();
 
   // Mail: PHP's mail() and Joomla's sendmail mailer start "sendmail"; the worker catches the message instead.
   php.setCommandSpawnHandler('sendmail', createSpawnHandler(catchMail));
-  await setPhpIniEntries(php, { sendmail_path: '/usr/sbin/sendmail -t -i' });
 
   progress('Configuring the site');
   php.writeFile('/tmp/playground.json', JSON.stringify({ siteUrl, password, root: DOCUMENT_ROOT }));
@@ -685,10 +687,14 @@ async function enableNetwork(php, caRoot) {
  * would leave the scope and end on a 404 of the web server. A file PHP runs before every script corrects it, and
  * tells the playground's system plugin that it runs in the browser.
  */
-async function prependFile(php, sitePath, hasCorsProxy) {
+async function prependFile(php, { sitePath, hasCorsProxy, password }) {
+  // The Super User's account, for the notice on the login form (plg_system_playground). It is this playground's
+  // random password, which the toolbar shows anyway.
   php.writeFile(PREPEND_FILE, `<?php
     $_SERVER['JOOMLA_PLAYGROUND'] = 'browser';
     $_SERVER['JOOMLA_PLAYGROUND_CORS_PROXY'] = ${hasCorsProxy ? "'1'" : "''"};
+    $_SERVER['JOOMLA_PLAYGROUND_USERNAME'] = 'admin';
+    $_SERVER['JOOMLA_PLAYGROUND_PASSWORD'] = ${JSON.stringify(password)};
     $prefix = ${JSON.stringify(sitePath)};
     if (isset($_SERVER['SCRIPT_NAME']) && !str_starts_with($_SERVER['SCRIPT_NAME'], $prefix . '/')) {
         $_SERVER['SCRIPT_NAME'] = $prefix . $_SERVER['SCRIPT_NAME'];

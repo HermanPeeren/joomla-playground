@@ -80,7 +80,8 @@ $sqlite = null;
 $db->disconnect();
 $db = null;
 
-setConfiguration($site . '/configuration.php', ['mailonline' => false, 'gzip' => false, 'caching' => 0]);
+// Sessions of 4 hours instead of 15 minutes: a playground is for trying things, often with pauses.
+setConfiguration($site . '/configuration.php', ['mailonline' => false, 'gzip' => false, 'caching' => 0, 'lifetime' => 240]);
 
 // 3. Files the browser playground does not need
 step('Removing build sources, caches and logs');

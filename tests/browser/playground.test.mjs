@@ -337,6 +337,7 @@ describe('Blueprints', () => {
             file_put_contents('images/check.json', json_encode([
                 'php'      => PHP_VERSION,
                 'sitename' => (new JConfig())->sitename,
+                'lifetime' => (new JConfig())->lifetime,
                 'item'     => $db->query('SELECT title FROM jos_playgroundtest_items')->fetchColumn(),
                 'debug'    => $db->query("SELECT enabled FROM jos_extensions WHERE element = 'debug' AND folder = 'system'")->fetchColumn(),
                 'articles' => $db->query('SELECT COUNT(*) FROM jos_content')->fetchColumn(),
@@ -368,11 +369,13 @@ describe('Blueprints', () => {
 
     assert.match(check.check.php, /^8\.3\./);
     assert.equal(check.check.sitename, 'Blueprint Site');
+    assert.equal(String(check.check.lifetime), '240', 'Sessions last 4 hours');
     assert.equal(check.check.item, 'Changed by a blueprint');
     assert.equal(String(check.check.debug), '1');
     assert.ok(Number(check.check.articles) > 5, `Sample data installed: ${check.check.articles} articles`);
     assert.equal(check.file, 'Written by a blueprint');
     assert.match(check.administrator, /mod-login-username|id="form-login"/, 'login=no: the administrator shows the login form');
+    assert.ok(check.administrator.includes(result.password), 'The login form says which password to use');
     assert.equal(check.frame, `${result.siteUrl}/index.php`);
     await tab.close();
   });
