@@ -3,7 +3,8 @@
 // Requests from the Joomla iframe go to a URL like <playground>/scope-<id>-6-2-0/administrator/: the tab's scope,
 // which ends with the Joomla version of its bundle. This worker answers them: media/ files come from that static
 // bundle (joomla/6.2.0/media/), everything else is sent over a BroadcastChannel to the PHP worker of the tab that
-// owns the scope, which runs Joomla.
+// owns the scope, which runs Joomla. Media files the bundle does not have, such as those of an extension installed
+// in the playground, come from the site's own files, through the PHP worker too.
 
 const channel = new BroadcastChannel('joomla-playground');
 const pending = new Map();
@@ -36,13 +37,24 @@ self.addEventListener('fetch', (event) => {
   const [, scope, major, minor, patch, path = '/'] = match;
 
   if (path.startsWith('/media/')) {
-    event.respondWith(fetch(new URL(`joomla/${major}.${minor}.${patch}${path}${url.search}`, base)));
+    event.respondWith(fromBundle(new URL(`joomla/${major}.${minor}.${patch}${path}${url.search}`, base), path).then((response) => response ?? runInPhp(event.request, scope)));
 
     return;
   }
 
   event.respondWith(runInPhp(event.request, scope));
 });
+
+/**
+ * A media file of the static bundle, or null when the bundle does not have it. (A development server may answer a
+ * missing file with its index page instead of a 404.)
+ */
+async function fromBundle(url, path) {
+  const response = await fetch(url);
+  const fallbackPage = response.headers.get('content-type')?.includes('text/html') && !/\.html?$/.test(path);
+
+  return response.ok && !fallbackPage ? response : null;
+}
 
 async function runInPhp(request, scope) {
   const id = crypto.randomUUID();

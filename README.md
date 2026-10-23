@@ -13,8 +13,8 @@ sent to a server.
 
 - **Multilingual site:** <https://hermanpeeren.github.io/joomla-playground/?blueprint=heritage-demo>. A site in
   English, Dutch, German, French and Spanish, with content about UNESCO World Heritage sites from the
-  [demonstration data](https://github.com/ceford/cefjdemos-plg-demodata) of Clifford E Ford. An article on its
-  home page explains how a multilingual Joomla site works. It starts in a few seconds, from a prebuilt copy of
+  [demonstration data](https://github.com/ceford/cefjdemos-plg-demodata) of Clifford E Ford. It starts in a few
+  seconds, from a prebuilt copy of
   the site. Add `&fresh=1` to watch the blueprint build it in your browser instead: that takes about 45 seconds,
   plus a minute for the Smart Search index while you can already look around.
 

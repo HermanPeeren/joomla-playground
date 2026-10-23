@@ -894,7 +894,9 @@ System > Install Languages now installs language packs, without a CORS proxy.
 <https://hermanpeeren.github.io/joomla-playground/?blueprint=heritage-demo> sets up a multilingual site with
 Clifford E Ford's [demonstration data plugin](https://github.com/ceford/cefjdemos-plg-demodata) and
 [module](https://github.com/ceford/cefjdemos-mod-demodata): the *heritage* dataset (UNESCO World Heritage sites)
-in English, Dutch, German, French and Spanish. It follows the setup of the plugin's README.
+in English, Dutch, German, French and Spanish. It follows the setup of the plugin's README. (A first version also
+added an English article that explained multilingual sites; it is kept in `docs/demos/heritage-demo-article.html`,
+see §26.)
 
 **The blueprint** (`web/public/blueprints/heritage-demo.json`):
 1. `installLanguage` nl-NL, de-DE, fr-FR, es-ES: the packs on board (§23), and their content languages published.
@@ -904,8 +906,7 @@ in English, Dutch, German, French and Spanish. It follows the setup of the plugi
 5. `installExtension` the plugin; `enableExtension` with its options: dataset `heritage`, the five languages.
 6. `addUserGroup` "Magazine Reviewers" (see below).
 7. `importSampleData` with `group: "demodata"`: the 16 steps the module's Install button runs.
-8. `addArticle` "About this multilingual demo": what makes a Joomla site multilingual, how to try it, and how this
-   site was made. Featured, for all languages.
+8. (Removed, see §26: `addArticle` "About this multilingual demo".)
 
 **New in the playground for it:**
 - `?blueprint=<name>`: the playground's own blueprints, in `web/public/blueprints/`.
@@ -927,6 +928,7 @@ is patched (`patches` in `assets.json`), or the blueprint works around them:
 | `createModel('NewsFeed', …)`: the class is `NewsfeedModel` | On a case-sensitive file system (Linux) no model is found: step 11 (newsfeeds) fails | Patched |
 | The completion step sends a private message from user "superman" to "playwright"; the heritage dataset has neither | Invalid SQL (`user_id_from = ,`): step 16 fails | Patched: skipped without those users |
 | It stores a privacy consent for user "johndoe", who is not in the heritage dataset | `''` as a user id: rejected by MySQL's strict mode and by SQLite | Patched: skipped without that user |
+| It adds group "Oddjob", which the heritage dataset does not have, to the Special view level | The rules became `[6,3,8,]`, invalid JSON: Joomla could not work out a user's view levels, and the administrator's menu and toolbar buttons disappeared | Patched: skipped without that group |
 | The workflow transitions refer to a stage "Published"; the stage is called "Article published!" | PHP warnings, transitions without a stage | Not fixed; the demo does not use the workflows |
 | No language string `PLG_DEMODATA_USER_STEP_FAILED` | Error messages show the key only | Not fixed |
 
@@ -964,7 +966,7 @@ A prebuilt export would start in a few seconds, with the index already built; th
 plan).
 
 **Tests:** the browser suite (19 tests) runs the whole demo and checks the home page of each of the five
-languages: its language, the explanation article, the language switcher and the heritage articles. It waits for
+languages: its language, the language switcher and the heritage articles. It waits for
 the Smart Search index in the background and searches for a heritage article.
 
 ## 25. Prebuilt demos: the heritage demo in seconds (2026-10-23)
@@ -981,7 +983,7 @@ every visitor.
   steps. A changed blueprint, `&fresh=1`, or a URL that changes the blueprint (`php`, `joomla`, `url`, `login`,
   `extension`, `language`, a fragment) runs the blueprint itself.
 - **Measured** (headless Chrome, local server): ready in 4.0–4.9 s in the worker, 4.5–7.2 s from opening the link,
-  instead of about 45 s plus the index. Everything is there: the five languages, the article, the Smart Search
+  instead of about 45 s plus the index. Everything is there: the five languages, the heritage content, the Smart Search
   index, the Super User (with a new password).
 - **Kept up to date:** the Pages workflow builds the demos on every deploy. It now also runs every day, and then
   deploys only when something changed: the latest commit of main (code, blueprints, `joomla-versions.json`) or of
@@ -990,7 +992,25 @@ every visitor.
 - **Tests** (20): the demo is built with `&fresh=1`, exported like `build-demos.mjs` does, and then started again
   from the export: prebuilt, in seconds, in French, with search.
 
-## 26. Sources
+## 26. Trying the demo: fixes (2026-10-23)
+
+- **The administrator's menu was gone** in the demo: the left menu and the Multilingual Status and User Menu
+  buttons. Another problem of the demonstration data plugin: it adds group "Oddjob", which the heritage dataset
+  does not have, to the Special view level, and the rules became `[6,3,8,]`. That is invalid JSON, so Joomla could
+  not work out a user's view levels. Patched in the playground's copy (see the table in §24); the browser test
+  checks the menu.
+- **Media files of installed extensions were missing.** Clifford E Ford installed his module and plugin by hand
+  on a plain playground: the module's Install button did nothing, because its JavaScript was not found. The
+  service worker served `media/` only from the static Joomla bundle; files an extension installs in `media/` exist
+  only in the site's files in the PHP worker. Now a media file the bundle does not have comes from the PHP worker,
+  which serves the site's own files. This affected every extension with its own CSS or JavaScript. (The demo's
+  blueprint did not notice: it runs the install steps itself instead of clicking the button.) The browser test
+  loads the module's script.
+- **The explanatory article is out:** in English only, it was not a good example on a site in five languages. Its
+  text is kept in `docs/demos/heritage-demo-article.html`, to come back later, preferably translated into each
+  content language and linked as associations.
+
+## 27. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)
