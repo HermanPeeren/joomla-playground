@@ -91,6 +91,12 @@ Then open http://localhost:5400/.
 demo. Extensions they install from hosts a browser may not download from (GitHub archives and releases) are
 listed in `web/public/blueprints/assets.json`. `npm run bundle` downloads them into `web/public/blueprints/assets/`
 (`bin/download-blueprint-assets.php`); the blueprint then installs `assets/...` from the playground's own website.
+- `"meta": { "prebuild": true }` in a blueprint makes `npm run demos` (`scripts/build-demos.mjs`, after
+  `npm run web:build`) run it in headless Chrome, wait for its background steps, and export the site to
+  `web/dist/demos/<name>.zip`. `<name>.json` next to it holds the SHA-256 of the blueprint file. `?blueprint=<name>`
+  starts from the export while the blueprint is unchanged; otherwise, or with `&fresh=1`, it runs the blueprint.
+- The Pages workflow builds the demos. It also runs every day, and then deploys only when main or one of the
+  repositories in `assets.json` has a new commit since the last deploy (remembered in the Actions cache).
 - `folder` repacks one folder of a GitHub archive as an installable package.
 - `patches` correct known bugs of a package until its author fixes them; each says why. A patch whose text is
   gone is skipped with a notice, so a fix upstream does not break the build.

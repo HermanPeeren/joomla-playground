@@ -16,7 +16,8 @@
     "test:proxy": "node --test tests/proxy/cors-proxy.test.mjs",
     "proxy:dev": "node proxy/dev-server.mjs",
     "test:scripts": "node --test tests/scripts/update-joomla-versions.test.mjs",
-    "joomla:versions": "node scripts/update-joomla-versions.mjs"
+    "joomla:versions": "node scripts/update-joomla-versions.mjs",
+    "demos": "node scripts/build-demos.mjs"
   },
   "devDependencies": {
     "@php-wasm/fs-journal": "3.1.60",

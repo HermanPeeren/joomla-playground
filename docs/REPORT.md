@@ -967,7 +967,30 @@ plan).
 languages: its language, the explanation article, the language switcher and the heritage articles. It waits for
 the Smart Search index in the background and searches for a heritage article.
 
-## 25. Sources
+## 25. Prebuilt demos: the heritage demo in seconds (2026-10-23)
+
+A blueprint does the same work in every visitor's browser. For the heritage demo that is about 45 s, plus a
+minute of Smart Search indexing. Its result is a site like any other, so it can be exported once and imported by
+every visitor.
+- **At build time:** `npm run demos` (`scripts/build-demos.mjs`) starts each blueprint with `"prebuild": true` in
+  headless Chrome, against the built playground. It waits for the background steps, then clicks **Export**. The
+  zip goes to `demos/<name>.zip`, and `demos/<name>.json` holds the SHA-256 of the blueprint file, the Joomla and
+  PHP version, and the build time. The heritage demo: 31.3 MB, built in 134 s.
+- **In the browser:** `?blueprint=heritage-demo` fetches the blueprint and hashes it. When `demos/heritage-demo.json`
+  has the same hash, the page starts from the zip, like **Import**, with the blueprint's landing page and no
+  steps. A changed blueprint, `&fresh=1`, or a URL that changes the blueprint (`php`, `joomla`, `url`, `login`,
+  `extension`, `language`, a fragment) runs the blueprint itself.
+- **Measured** (headless Chrome, local server): ready in 4.0–4.9 s in the worker, 4.5–7.2 s from opening the link,
+  instead of about 45 s plus the index. Everything is there: the five languages, the article, the Smart Search
+  index, the Super User (with a new password).
+- **Kept up to date:** the Pages workflow builds the demos on every deploy. It now also runs every day, and then
+  deploys only when something changed: the latest commit of main (code, blueprints, `joomla-versions.json`) or of
+  the repositories in `assets.json` (the demonstration data). The Actions cache remembers what was deployed. New
+  language packs alone do not start a deploy.
+- **Tests** (20): the demo is built with `&fresh=1`, exported like `build-demos.mjs` does, and then started again
+  from the export: prebuilt, in seconds, in French, with search.
+
+## 26. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)

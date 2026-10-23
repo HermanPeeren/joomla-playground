@@ -6,7 +6,8 @@
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
@@ -483,7 +484,7 @@ describe('Blueprints', () => {
   test('sets up the multilingual heritage demo (?blueprint=heritage-demo)', async () => {
     const tab = await context.newPage();
 
-    await tab.goto(`${appUrl}?blueprint=heritage-demo`);
+    await tab.goto(`${appUrl}?blueprint=heritage-demo&fresh=1`);
 
     const result = await waitForPlayground(tab);
 
@@ -525,7 +526,45 @@ describe('Blueprints', () => {
     );
 
     assert.ok(found, 'Smart Search finds a heritage article');
+
+    // Export it, as scripts/build-demos.mjs does, as the prebuilt demo for the next test.
+    const [download] = await Promise.all([tab.waitForEvent('download', { timeout: 300000 }), tab.click('#export-site')]);
+    const blueprint = readFileSync(`${root}/web/dist/blueprints/heritage-demo.json`);
+
+    mkdirSync(`${root}/web/dist/demos`, { recursive: true });
+    await download.saveAs(`${root}/web/dist/demos/heritage-demo.zip`);
+    writeFileSync(
+      `${root}/web/dist/demos/heritage-demo.json`,
+      JSON.stringify({ blueprint: createHash('sha256').update(blueprint).digest('hex'), joomla: result.manifest.joomla, php: result.phpVersion })
+    );
     await tab.close();
+  });
+
+  test('starts the heritage demo from its prebuilt export, in seconds', async () => {
+    const tab = await context.newPage();
+
+    try {
+      await tab.goto(`${appUrl}?blueprint=heritage-demo`);
+
+      const result = await waitForPlayground(tab);
+
+      console.log('prebuilt heritage demo timings (ms):', JSON.stringify(result.timings));
+      assert.match(await tab.locator('#status').textContent(), /prebuilt demo/);
+      assert.ok(result.timings.ready < 30000, `Ready in ${result.timings.ready} ms`);
+
+      const page = await tab.evaluate(async (siteUrl) => {
+        const html = await (await fetch(`${siteUrl}/index.php/fr/`)).text();
+        const search = await (await fetch(`${siteUrl}/index.php/en/?option=com_finder&view=search&q=Frogs`)).text();
+
+        return { lang: html.match(/<html[^>]* lang="([^"]+)"/)?.[1], about: html.includes('About this multilingual demo'), search: search.includes('November: Frogs') };
+      }, result.siteUrl);
+
+      assert.deepEqual(page, { lang: 'fr-fr', about: true, search: true });
+    } finally {
+      await tab.close();
+      // The next build makes its own (npm run demos).
+      rmSync(`${root}/web/dist/demos`, { recursive: true, force: true });
+    }
   });
 
   test('reports a wrong blueprint', async () => {

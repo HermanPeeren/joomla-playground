@@ -14,9 +14,9 @@ sent to a server.
 - **Multilingual site:** <https://hermanpeeren.github.io/joomla-playground/?blueprint=heritage-demo>. A site in
   English, Dutch, German, French and Spanish, with content about UNESCO World Heritage sites from the
   [demonstration data](https://github.com/ceford/cefjdemos-plg-demodata) of Clifford E Ford. An article on its
-  home page explains how a multilingual Joomla site works. Setting it up takes about 45 seconds: the blueprint
-  installs everything in your browser. Then the Smart Search index is built for about a minute, while you can
-  already look around; the toolbar shows its progress.
+  home page explains how a multilingual Joomla site works. It starts in a few seconds, from a prebuilt copy of
+  the site. Add `&fresh=1` to watch the blueprint build it in your browser instead: that takes about 45 seconds,
+  plus a minute for the Smart Search index while you can already look around.
 
 ## Logging in
 
@@ -84,7 +84,8 @@ A link can say how a new playground should look. Add these to the address:
 | `extension` | `?extension=https://example.org/mod_hello.zip` | Install an extension package (repeatable) |
 | `language` | `?language=nl-NL` | Install that language and make it the default of the site and the administrator |
 | `blueprint-url` | `?blueprint-url=https://example.org/blueprint.json` | Set up the site with a blueprint |
-| `blueprint` | `?blueprint=heritage-demo` | Set up the site with one of the playground's own blueprints |
+| `blueprint` | `?blueprint=heritage-demo` | Set up the site with one of the playground's own blueprints (from its prebuilt copy, if it has one) |
+| `fresh` | `?blueprint=heritage-demo&fresh=1` | Run the blueprint, even if there is a prebuilt copy |
 
 A **blueprint** is a small JSON file with the steps to set up a site. It can also be put in the address
 itself, after `#`. For example, this one installs Joomla's blog sample data, renames the site and opens the

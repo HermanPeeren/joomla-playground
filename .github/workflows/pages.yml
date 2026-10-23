@@ -2,8 +2,14 @@ name: Deploy the playground
 
 # Publishes web/dist to GitHub Pages. Pages must be enabled with "GitHub Actions" as source
 # (Settings > Pages) before this workflow can deploy.
+#
+# Started by hand, or every day: then it deploys only when something the site is built from has changed since the
+# last deploy. That is the main branch (code, blueprints, joomla-versions.json) and the repositories the
+# prebuilt demos install from (web/public/blueprints/assets.json). Language packs are not checked.
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '41 5 * * *'
 
 permissions:
   contents: read
@@ -15,7 +21,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      key: ${{ steps.inputs.outputs.key }}
+      changed: ${{ github.event_name == 'workflow_dispatch' || steps.deployed.outputs.cache-hit != 'true' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The latest commit of main and of every GitHub repository in assets.json.
+      - name: What the site is built from
+        id: inputs
+        run: |
+          {
+            echo "main $(git rev-parse HEAD)"
+            for repository in $(grep -o 'https://github.com/[^/]*/[^/]*/archive/refs/heads/[^"]*' web/public/blueprints/assets.json | sort -u); do
+              name=$(echo "$repository" | cut -d/ -f4-5)
+              branch=$(basename "$repository" .zip)
+              echo "$name $(git ls-remote "https://github.com/$name" "refs/heads/$branch" | cut -f1)"
+            done
+          } | tee inputs.txt
+          echo "key=pages-$(sha256sum inputs.txt | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Deployed already?
+        id: deployed
+        uses: actions/cache/restore@v4
+        with:
+          path: inputs.txt
+          key: ${{ steps.inputs.outputs.key }}
+          lookup-only: true
+
   build:
+    needs: check
+    if: needs.check.outputs.changed == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -44,13 +83,17 @@ jobs:
           # https://joomla-playground-cors-proxy.<account>.workers.dev/
           VITE_CORS_PROXY: ${{ vars.CORS_PROXY }}
 
+      # Runs the blueprints with "prebuild" in headless Chrome and exports the sites (web/dist/demos/).
+      - name: Prebuild the demos
+        run: npm run demos
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/dist
 
   deploy:
-    needs: build
+    needs: [check, build]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -59,3 +102,11 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+      # Remember what was deployed, so the daily run skips the next deploy if nothing changed.
+      - run: echo "${{ needs.check.outputs.key }}" > inputs.txt
+
+      - uses: actions/cache/save@v4
+        with:
+          path: inputs.txt
+          key: ${{ needs.check.outputs.key }}
