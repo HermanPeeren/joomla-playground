@@ -3,7 +3,7 @@
 
 import { afterEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import proxy, { isAllowedHost } from '../../proxy/cors-proxy.js';
+import proxy, { isAllowedHost, isAllowedUrl } from '../../proxy/cors-proxy.js';
 
 const realFetch = globalThis.fetch;
 
@@ -46,6 +46,27 @@ describe('CORS proxy', () => {
     assert.equal(response.headers.get('access-control-allow-origin'), '*');
     assert.equal(response.headers.get('content-type'), 'application/zip');
     assert.equal(response.headers.get('set-cookie'), null);
+  });
+
+  test("takes the URL appended to the path, as @php-wasm's tcpOverFetch sends it", async () => {
+    const asked = upstream({
+      'https://update.joomla.org/language/details6/nl-NL_details.xml?a=1&b=2': () => new Response('<xml/>', { headers: { 'content-type': 'text/xml' } }),
+    });
+
+    const response = await proxy.fetch(
+      new Request('https://proxy.example/https://update.joomla.org/language/details6/nl-NL_details.xml?a=1&b=2', { headers: { origin: 'https://hermanpeeren.github.io' } })
+    );
+
+    assert.equal(response.status, 200);
+    assert.equal(asked[0].url, 'https://update.joomla.org/language/details6/nl-NL_details.xml?a=1&b=2');
+    assert.equal(response.headers.get('x-playground-cors-proxy'), 'true');
+    assert.match(response.headers.get('access-control-expose-headers'), /x-playground-cors-proxy/);
+    assert.match(response.headers.get('access-control-expose-headers'), /content-disposition/);
+
+    const refused = await proxy.fetch(new Request('https://proxy.example/https://evil.example/x'));
+
+    assert.equal(refused.status, 403);
+    assert.equal(refused.headers.get('x-playground-cors-proxy'), 'true');
   });
 
   test('follows redirects, checking every host', async () => {
@@ -106,6 +127,14 @@ describe('CORS proxy', () => {
     const env = { RATE_LIMITER: { limit: async () => ({ success: false }) } };
 
     assert.equal((await proxy.fetch(get('https://downloads.joomla.org/a.zip'), env)).status, 429);
+  });
+
+  test('allows only a path of a shared host', () => {
+    const entries = ['s3-us-west-2.amazonaws.com/joomla-official-downloads/'];
+
+    assert.ok(isAllowedUrl(new URL('https://s3-us-west-2.amazonaws.com/joomla-official-downloads/x/nl-NL.zip?sig=1'), entries));
+    assert.ok(!isAllowedUrl(new URL('https://s3-us-west-2.amazonaws.com/someone-else/file.zip'), entries));
+    assert.ok(!isAllowedUrl(new URL('https://s3-us-west-2.amazonaws.com/joomla-official-downloads-evil/file.zip'), entries));
   });
 
   test('matches wildcard hosts', () => {

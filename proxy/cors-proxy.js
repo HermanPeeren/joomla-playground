@@ -2,15 +2,21 @@
 //
 // The playground runs in the browser, which may only download from hosts that send CORS headers. Joomla's
 // downloads (extensions, language packs, updates) and GitHub release assets do not. This worker fetches such a
-// file and returns it with CORS headers:
+// file and returns it with CORS headers. Two ways to ask:
 //
-//   GET https://<worker>/?url=https%3A%2F%2Fdownloads.joomla.org%2F...
+//   GET https://<worker>/?url=https%3A%2F%2Fdownloads.joomla.org%2F...   the playground's blueprint downloads
+//   GET https://<worker>/https://downloads.joomla.org/...                @php-wasm's tcpOverFetch (PHP's own HTTP
+//                                                                          requests): the URL appended as it is
+//
+// Every answer carries X-Playground-Cors-Proxy, which tcpOverFetch checks to tell the proxy's answer from a
+// network error.
 //
 // Only GET and HEAD, only https, only the hosts in ALLOWED_HOSTS (also after redirects), at most MAX_BYTES.
 // Deploy: see docs/DEVELOPMENT.md. Settings (wrangler.toml [vars], all optional):
 //   ALLOWED_ORIGINS  comma-separated origins that may use the proxy, e.g. "https://hermanpeeren.github.io";
 //                    default "*" (any)
-//   ALLOWED_HOSTS    comma-separated hosts to replace the default list; "*.example.org" includes subdomains
+//   ALLOWED_HOSTS    comma-separated hosts to replace the default list; "*.example.org" includes subdomains,
+//                    "host/path" allows only URLs below that path on a shared host
 //   MAX_BYTES        largest download, default 50 MB
 // A rate limiting binding named RATE_LIMITER (Cloudflare Workers Rate Limiting) limits requests per client IP.
 
@@ -23,6 +29,9 @@ export const DEFAULT_ALLOWED_HOSTS = [
   'objects.githubusercontent.com',
   'release-assets.githubusercontent.com',
   'raw.githubusercontent.com',
+  // downloads.joomla.org redirects to Joomla's S3 bucket: that bucket only, not all of S3.
+  's3-us-west-2.amazonaws.com/joomla-official-downloads/',
+  'joomla-official-downloads.s3.us-west-2.amazonaws.com',
 ];
 
 const DEFAULT_MAX_BYTES = 50 * 1024 * 1024;
@@ -32,14 +41,24 @@ export default {
   async fetch(request, env = {}) {
     const origin = request.headers.get('origin');
     const allowedOrigin = corsOrigin(origin, env);
-    const cors = allowedOrigin
-      ? { 'access-control-allow-origin': allowedOrigin, 'access-control-expose-headers': 'content-length, content-type', vary: 'origin' }
-      : {};
+    // Joomla's installer names a download after its Content-Disposition: without it, a language pack would be
+    // saved without .zip and not be unpacked.
+    const exposed = 'content-length, content-type, content-disposition, etag, last-modified, x-playground-cors-proxy';
+    const cors = {
+      'x-playground-cors-proxy': 'true',
+      ...(allowedOrigin ? { 'access-control-allow-origin': allowedOrigin, 'access-control-expose-headers': exposed, vary: 'origin' } : {}),
+    };
 
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         status: allowedOrigin ? 204 : 403,
-        headers: { ...cors, 'access-control-allow-methods': 'GET, HEAD', 'access-control-max-age': '86400' },
+        headers: {
+          ...cors,
+          'access-control-allow-methods': 'GET, HEAD',
+          // tcpOverFetch passes on the headers of PHP's request.
+          'access-control-allow-headers': request.headers.get('access-control-request-headers') ?? '*',
+          'access-control-max-age': '86400',
+        },
       });
     }
 
@@ -64,16 +83,16 @@ export default {
     let target;
 
     try {
-      target = new URL(new URL(request.url).searchParams.get('url') ?? '');
+      target = new URL(targetUrl(request.url));
     } catch {
-      return fail(400, 'Give the file to download as ?url=<encoded URL>');
+      return fail(400, 'Give the file to download as ?url=<encoded URL>, or append its URL: /https://...');
     }
 
     const hosts = allowedHosts(env);
 
     // Follow redirects here, so every hop is checked against the allowed hosts.
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      if (target.protocol !== 'https:' || !isAllowedHost(target.hostname, hosts)) {
+      if (target.protocol !== 'https:' || !isAllowedUrl(target, hosts)) {
         return fail(403, `Not an allowed download: ${target.href}`);
       }
 
@@ -110,10 +129,34 @@ export default {
   },
 };
 
-export function isAllowedHost(hostname, hosts) {
-  hostname = hostname.toLowerCase();
+/**
+ * The URL to download: ?url=<encoded URL>, or everything after the first slash (/https://host/path?query).
+ */
+function targetUrl(requestUrl) {
+  const url = new URL(requestUrl);
+  const appended = requestUrl.slice(url.origin.length + 1);
 
-  return hosts.some((host) => (host.startsWith('*.') ? hostname.endsWith(host.slice(1)) : hostname === host));
+  return /^https?:\/\//i.test(appended) ? appended : (url.searchParams.get('url') ?? '');
+}
+
+export function isAllowedHost(hostname, hosts) {
+  return isAllowedUrl(new URL(`https://${hostname}/`), hosts);
+}
+
+/**
+ * Whether a URL matches an entry of the list: "host", "*.domain" or "host/path/" (that path and below).
+ */
+export function isAllowedUrl(url, entries) {
+  const hostname = url.hostname.toLowerCase();
+
+  return entries.some((entry) => {
+    const slash = entry.indexOf('/');
+    const host = slash === -1 ? entry : entry.slice(0, slash);
+    const path = slash === -1 ? '/' : entry.slice(slash);
+    const hostMatches = host.startsWith('*.') ? hostname.endsWith(host.slice(1)) : hostname === host;
+
+    return hostMatches && url.pathname.startsWith(path);
+  });
 }
 
 function allowedHosts(env) {

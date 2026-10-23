@@ -92,7 +92,7 @@ function progress(message) {
  * @param {ArrayBuffer} [options.zip] An exported playground to start from
  * @param {string} [options.php] PHP version; default: the saved site's, or DEFAULT_PHP_VERSION
  * @param {object} [options.blueprint] How to set up a new playground (see blueprint.js)
- * @param {string} [options.corsProxy] URL prefix of a CORS proxy for downloads
+ * @param {string} [options.corsProxy] URL of a CORS proxy (proxy/cors-proxy.js) for downloads
  */
 async function boot({ base, scope, joomla, site = null, title = null, zip = null, php: phpVersion = null, blueprint = null, corsProxy = null }) {
   const started = performance.now();
@@ -114,13 +114,13 @@ async function boot({ base, scope, joomla, site = null, title = null, zip = null
   });
   const [php, manifest, files] = await Promise.all([
     // Outgoing HTTP(S) from PHP goes through the browser's fetch() (see enableNetwork()).
-    loadWebRuntime(phpVersion, { tcpOverFetch: { CAroot: caRoot } }).then((runtime) => (lap('php'), new PHP(runtime))),
+    loadWebRuntime(phpVersion, { tcpOverFetch: { CAroot: caRoot, ...(corsProxy ? { corsProxyUrl: corsProxy } : {}) } }).then((runtime) => (lap('php'), new PHP(runtime))),
     fetch(new URL(`joomla/${joomla}/manifest.json`, base)).then((response) => response.json()),
     siteFiles({ bundle: new URL(`joomla/${joomla}/`, base), site, meta, zip }).then((files) => (lap(meta ? 'read' : 'download'), files)),
   ]);
 
   await enableNetwork(php, caRoot);
-  await prependFile(php, new URL(siteUrl).pathname);
+  await prependFile(php, new URL(siteUrl).pathname, Boolean(corsProxy));
 
   progress(meta ? 'Opening the saved site' : 'Unpacking Joomla');
   php.mkdir(DOCUMENT_ROOT);
@@ -685,9 +685,10 @@ async function enableNetwork(php, caRoot) {
  * would leave the scope and end on a 404 of the web server. A file PHP runs before every script corrects it, and
  * tells the playground's system plugin that it runs in the browser.
  */
-async function prependFile(php, sitePath) {
+async function prependFile(php, sitePath, hasCorsProxy) {
   php.writeFile(PREPEND_FILE, `<?php
     $_SERVER['JOOMLA_PLAYGROUND'] = 'browser';
+    $_SERVER['JOOMLA_PLAYGROUND_CORS_PROXY'] = ${hasCorsProxy ? "'1'" : "''"};
     $prefix = ${JSON.stringify(sitePath)};
     if (isset($_SERVER['SCRIPT_NAME']) && !str_starts_with($_SERVER['SCRIPT_NAME'], $prefix . '/')) {
         $_SERVER['SCRIPT_NAME'] = $prefix . $_SERVER['SCRIPT_NAME'];

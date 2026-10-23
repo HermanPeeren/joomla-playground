@@ -67,20 +67,26 @@ Then open http://localhost:5400/.
 - The page starts PHP in a Web Worker and unpacks Joomla into memory. It then opens the administrator, already
   logged in.
 - PHP 8.3, 8.4 and 8.5 are built in (`web/vite.config.js`); the others point to a stub.
-- `VITE_CORS_PROXY` (at build time) sets a CORS proxy for blueprint downloads from hosts without CORS headers,
-  as a URL prefix to which the encoded download URL is appended, e.g. `https://proxy.example.org/?url=`.
+- `VITE_CORS_PROXY` (at build time) sets the CORS proxy (see below) by its URL, e.g.
+  `https://joomla-playground-cors-proxy.<account>.workers.dev/`. Blueprint downloads and PHP's own HTTP requests
+  use it for hosts without CORS headers.
 - Blueprints: `web/src/blueprint.js` reads them from the URL, `web/src/blueprint-steps.js` runs the steps in
   the PHP worker.
 
 ## The CORS proxy
 
 Browsers only download from hosts that send CORS headers. Joomla's downloads and GitHub release assets do not,
-so blueprints can fall back to a small proxy: [`proxy/cors-proxy.js`](../proxy/cors-proxy.js), a Cloudflare
+so the playground can fall back to a small proxy: [`proxy/cors-proxy.js`](../proxy/cors-proxy.js), a Cloudflare
 Worker.
-- Only GET and HEAD, only https, only allowed hosts (downloads/update/extensions.joomla.org, GitHub and its
-  download hosts), also after redirects, which it follows itself; at most 50 MB.
+- Blueprint downloads ask for `<proxy>?url=<encoded URL>`. PHP's own requests (Install Languages, the installer's
+  Install from URL) go through `@php-wasm`'s `tcpOverFetch`, which asks for `<proxy><URL>`.
+- Every answer has an `X-Playground-Cors-Proxy` header, which `tcpOverFetch` requires.
+- Only GET and HEAD, only https, only allowed hosts (downloads/update/extensions.joomla.org, Joomla's download
+  bucket on S3, GitHub and its download hosts), also after redirects, which it follows itself; at most 50 MB.
 - `ALLOWED_ORIGINS` limits which sites may use it; a rate limiting binding limits requests per IP.
 - Tests with a fake upstream: `npm run test:proxy`.
+- `npm run proxy:dev` runs it locally with Node on port 5480; build the playground with
+  `VITE_CORS_PROXY=http://localhost:5480/` to use it.
 
 To deploy it (needs a Cloudflare account):
 
@@ -88,8 +94,8 @@ To deploy it (needs a Cloudflare account):
 cd proxy && npx wrangler deploy
 ```
 
-Then set the repository variable `CORS_PROXY` to `https://<worker host>/?url=`; the Pages workflow builds the
-playground with it (`VITE_CORS_PROXY`).
+Then set the repository variable `CORS_PROXY` to `https://<worker host>/` and run the Pages workflow: it builds
+the playground with it (`VITE_CORS_PROXY`).
 
 ## Joomla on SQLite with native PHP
 
