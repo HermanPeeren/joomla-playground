@@ -9,6 +9,16 @@ After a few seconds you see Joomla's administrator, already logged in as a Super
 browser: PHP is compiled to WebAssembly, and the site and its database live in the tab's memory. Nothing is
 sent to a server.
 
+## Logging in
+
+The playground logs you in to the administrator by itself. If you log out, or want to log in on the front end:
+- **Username:** `admin`
+- **Password:** different for every playground. The toolbar shows it (top left, "Super User: admin / …"), and so
+  does the login form. A saved site keeps its password.
+
+A session lasts 4 hours (Joomla's default is 15 minutes); you can change that under System > Global
+Configuration > System > Session Lifetime.
+
 ## Using the playground
 
 The toolbar above the site:
@@ -29,8 +39,8 @@ On the right:
   keeps the version it was made with.
 - **PHP** switches the PHP version (8.3, 8.4 or 8.5): a saved site reopens with it, a temporary playground starts
   again from the same link.
-- The Super User's name and password, in case you log out or want to see the site as a logged-in user. Hover
-  over the database driver for timings.
+- The Super User's name and password (see [Logging in](#logging-in)). Hover over the database driver for
+  timings.
 
 **Temporary or saved?**
 - A new playground is temporary: reloading the page or closing the tab throws it away.

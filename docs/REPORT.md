@@ -851,7 +851,22 @@ The playground offers the newest stable release of each Joomla major version in 
 - **Tests:** four unit tests of the version choice (`npm run test:scripts`), in CI. On 2026-10-23 the list was up to
   date: 6.2.0 (default) and 5.4.10.
 
-## 22. Sources
+## 22. Logging in again, and longer sessions (2026-10-23)
+
+- **The password on the login form:** each playground has its own random Super User password, shown in the
+  toolbar. Users who logged out did not find it. The PHP worker now passes the account to PHP
+  (`$_SERVER['JOOMLA_PLAYGROUND_USERNAME']`, `…_PASSWORD`, in the `auto_prepend_file`). The playground's system plugin
+  shows it as a notice on the administrator's login form and on the front end's login page. The administrator
+  only routes a guest to `com_login` at dispatch, after `onAfterRoute`, so the plugin checks for a guest instead of
+  the option.
+- **Sessions of 4 hours:** the bundles set Joomla's session lifetime to 240 minutes instead of 15. Global
+  Configuration can change it, and a saved site keeps its own setting.
+- **Found:** `php.ini` settings (`setPhpIniEntries()`) only take effect when they are set before PHP's first run in
+  the worker. The `sendmail_path` setting came after the first runs; it is now set with the others, first.
+- **Tests:** the blueprint test checks the password on the login form and the session lifetime.
+- README: a "Logging in" section.
+
+## 23. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)
