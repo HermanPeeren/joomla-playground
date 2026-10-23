@@ -1012,6 +1012,11 @@ every visitor.
   the site name's row, at the right. The switcher's row lies on top, so the flags can be clicked, with
   `pointer-events: none` on its empty part, so the site name's link works too. On narrow screens the switcher
   stays above the site name. The browser test checks that every flag can be clicked.
+- **A loader while a playground starts:** the Joomla area stayed white for the seconds a playground takes to
+  start. Now it shows Joomla's own loader (the `joomla-core-loader` web component, the animated Joomla logo) with
+  the step it is at, until the first Joomla page has loaded; an error replaces the logo. `npm run bundle` copies
+  the loader from the default bundle to `joomla/joomla-core-loader.js`, because the page shows it before it knows
+  which bundle it will use.
 - **The explanatory article is out:** in English only, it was not a good example on a site in five languages. Its
   text is kept in `docs/demos/heritage-demo-article.html`, to come back later, preferably translated into each
   content language and linked as associations.

@@ -16,6 +16,8 @@ const corsProxy = import.meta.env.VITE_CORS_PROXY || null;
 
 const elements = {
   status: document.querySelector('#status'),
+  loading: document.querySelector('#loading'),
+  loadingStatus: document.querySelector('#loading-status'),
   frame: document.querySelector('#joomla'),
   site: document.querySelector('#open-site'),
   admin: document.querySelector('#open-admin'),
@@ -56,7 +58,21 @@ let selectedMail = null;
 function setStatus(message, isError = false) {
   elements.status.textContent = message;
   elements.status.classList.toggle('error', isError);
+
+  // While the loader shows, it says the same.
+  elements.loadingStatus.textContent = message;
+  elements.loading.classList.toggle('error', isError);
 }
+
+/**
+ * Joomla's loader over the Joomla frame while a playground starts, until its first page has loaded.
+ */
+function setLoading(loading) {
+  elements.loading.hidden = !loading;
+}
+
+// The loader is Joomla's own web component, from the default bundle (copied there by bin/build-browser-bundles.php).
+import(/* @vite-ignore */ new URL('joomla/joomla-core-loader.js', base).href).catch(() => {});
 
 function setBusy(busy) {
   for (const button of [elements.site, elements.admin, elements.newSite, elements.save, elements.exportSite, elements.importSite, elements.mail, elements.php]) {
@@ -123,6 +139,7 @@ function startWorker() {
  */
 async function boot(options = {}, transfer = []) {
   setBusy(true);
+  setLoading(true);
   elements.frame.src = 'about:blank';
   startWorker();
 
@@ -151,6 +168,7 @@ function show(path = '/administrator/') {
   elements.php.value = playground.phpVersion;
   elements.joomla.value = playground.manifest.joomla;
   elements.info.title = Object.entries(playground.timings).map(([step, ms]) => `${step}: ${ms} ms`).join('\n');
+  elements.frame.addEventListener('load', () => setLoading(false), { once: true });
   elements.frame.src = `${playground.siteUrl}${path}`;
   setBusy(false);
 
