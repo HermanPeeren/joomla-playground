@@ -89,7 +89,7 @@ export async function blueprintFromUrl(url) {
   }
 
   if (shortcuts.language) {
-    blueprint.steps.push({ step: 'setSiteLanguage', language: shortcuts.language });
+    blueprint.steps.push({ step: 'setSiteLanguage', language: shortcuts.language, administrator: true });
   }
 
   validate(blueprint);

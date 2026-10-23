@@ -59,6 +59,10 @@ Then open http://localhost:5400/.
   (`bin/build-browser-bundles.php`). It downloads Full Packages missing from `.cache/`, installs each, and packs
   it for the browser in `web/public/joomla/<version>/`. `web/public/joomla/versions.json` lists them.
   `--version=<version>` rebuilds one.
+- It also downloads the accredited language packs of each version into `joomla/<version>/languages/`
+  (`bin/download-language-packs.php`, cached in `.cache/language-packs/`; about 32 MB per version). The
+  playground's system plugin points Joomla's download of such a pack to that copy. `--no-languages` skips
+  them, for a quicker local build.
 - To offer another Joomla version, add it to `joomla-versions.json`; `default` is the version a new playground
   gets. The integration tests use `JOOMLA_VERSION` (`phpunit.xml.dist`, CI).
 - `npm run joomla:versions` (`scripts/update-joomla-versions.mjs`) moves every version in the list to the newest

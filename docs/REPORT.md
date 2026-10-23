@@ -866,7 +866,30 @@ The playground offers the newest stable release of each Joomla major version in 
 - **Tests:** the blueprint test checks the password on the login form and the session lifetime.
 - README: a "Logging in" section.
 
-## 23. Sources
+## 23. Language packs on board (2026-10-23)
+
+System > Install Languages now installs language packs, without a CORS proxy.
+- **The packs come with the playground:** for each Joomla version, `npm run bundle` downloads the accredited
+  language packs into `joomla/<version>/languages/` (`bin/download-language-packs.php`). It picks the pack the
+  way Joomla's installer does: the newest one in the language's details file on update.joomla.org whose target
+  platform matches the Joomla version. Its SHA-256 is checked. Joomla 6.2: 56 packs, 32 MB. `index.json` lists them,
+  with the download URL Joomla would use.
+- **Install Languages takes the playground's copy:** the PHP worker passes the bundle's URL to PHP. The
+  playground's system plugin handles `onInstallerBeforePackageDownload` (Joomla 5.0+). When the download URL is one
+  of the shipped packs, the plugin replaces it with the copy on the playground's own website. That needs no CORS
+  permission. The file is the same, so Joomla's checksum check still passes.
+- **`?language=nl-NL`** (and the `setSiteLanguage` step) installs the pack first when the language is missing. The
+  shortcut makes it the default of the site and of the administrator.
+- The notice "language packs cannot be installed from this list" only shows when the bundle has no packs and the
+  playground has no CORS proxy.
+- **Cost:** about 32 MB more on the static site per Joomla version; a browser only downloads the pack it installs.
+  The first download at build time takes about 2 minutes; later builds take the packs from `.cache/`.
+- **Measured:** installing a pack from Install Languages takes a few seconds. Opening Install Languages took 16–17 s
+  in these test runs, against about 2 s in §18; the list comes from update.joomla.org. Not investigated yet.
+- **Tests:** Install Languages installs Dutch (on the first page of the list); `?language=nl-NL` opens a Dutch
+  administrator.
+
+## 24. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)

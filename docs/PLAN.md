@@ -169,8 +169,9 @@ pitch to the Joomla production department.
   - `?joomla=6.2|5.4|nightly&php=8.3|8.4|8.5&language=nl-NL&login=yes`
   - `?extension=<url to zip>`
   - `?url=/administrator/…` (landing page)
-  - **Done (2026-10-22)** (REPORT §14): `php`, `url`, `login`, `extension`, `language` (an installed language),
-    `blueprint-url`; `joomla` since part 6 (REPORT §19).
+  - **Done (2026-10-22)** (REPORT §14): `php`, `url`, `login`, `extension`, `language`, `blueprint-url`; `joomla`
+    since part 6 (REPORT §19). Since 2026-10-23 the language packs come with the playground (REPORT §23), so
+    `language` installs them, and so does System > Install Languages.
 - **Blueprint v0** (JSON in the URL fragment or `?blueprint-url=`). Steps:
   - `installExtension`, `enableExtension`, `login`, `setGlobalConfig`, `runPHP`, `runSql`, `writeFile`,
     `unzip`, `importSampleData`, `setSiteLanguage`.

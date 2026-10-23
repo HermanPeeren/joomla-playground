@@ -8,10 +8,11 @@
  * list the playground chooses from.
  *
  * Usage:
- *   php bin/build-browser-bundles.php [--out=web/public/joomla] [--version=<one version>]
+ *   php bin/build-browser-bundles.php [--out=web/public/joomla] [--version=<one version>] [--no-languages]
  *
  * Output (in --out):
- *   <version>/     one bundle: site.zip, media/, manifest.json
+ *   <version>/     one bundle: site.zip, media/, manifest.json, and languages/ with the accredited language packs
+ *                  (bin/download-language-packs.php), unless --no-languages
  *   versions.json  { "default": "6.2.0", "versions": [ <manifest of each bundle>, ... ] }
  *
  * A Full Package that is not in .cache/ yet is downloaded from the joomla/joomla-cms releases on GitHub.
@@ -19,7 +20,7 @@
 
 const PLAYGROUND_ROOT = __DIR__ . '/..';
 
-$options  = getopt('', ['out:', 'version:']);
+$options  = getopt('', ['out:', 'version:', 'no-languages']);
 $out      = $options['out'] ?? PLAYGROUND_ROOT . '/web/public/joomla';
 $list     = json_decode(file_get_contents(PLAYGROUND_ROOT . '/joomla-versions.json'), true, flags: JSON_THROW_ON_ERROR);
 $versions = isset($options['version']) ? [$options['version']] : $list['versions'];
@@ -61,6 +62,24 @@ foreach ($versions as $version) {
     );
 
     proc_close($process) === 0 || fail('Building the bundle of Joomla ' . $version . ' failed');
+
+    $languages = 0;
+
+    if (!isset($options['no-languages'])) {
+        echo "== Language packs for Joomla $version\n";
+        $process = proc_open(
+            [PHP_BINARY, __DIR__ . '/download-language-packs.php', '--joomla=' . $version, '--out=' . $out . '/' . $version . '/languages'],
+            [1 => STDOUT, 2 => STDERR],
+            $pipes
+        );
+        proc_close($process) === 0 || fail('Downloading the language packs of Joomla ' . $version . ' failed');
+        $languages = \count(json_decode(file_get_contents($out . '/' . $version . '/languages/index.json'), true)['packs']);
+    }
+
+    // The playground uses the language packs of a bundle when its manifest counts them.
+    $file     = $out . '/' . $version . '/manifest.json';
+    $manifest = json_decode(file_get_contents($file), true);
+    file_put_contents($file, json_encode([...$manifest, 'languages' => $languages], JSON_PRETTY_PRINT) . "\n");
 }
 
 $manifests = [];

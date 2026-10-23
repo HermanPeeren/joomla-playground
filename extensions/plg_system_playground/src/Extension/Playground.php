@@ -7,7 +7,9 @@
 
 namespace JoomlaPlayground\Plugin\System\Playground\Extension;
 
+use Joomla\CMS\Event\Installer\BeforePackageDownloadEvent;
 use Joomla\CMS\Event\Model\PrepareFormEvent;
+use Joomla\CMS\Http\HttpFactory;
 use Joomla\CMS\Language\Text;
 use Joomla\CMS\Plugin\CMSPlugin;
 use Joomla\Database\DatabaseAwareTrait;
@@ -32,8 +34,9 @@ final class Playground extends CMSPlugin implements SubscriberInterface
     public static function getSubscribedEvents(): array
     {
         return [
-            'onAfterRoute'         => 'onAfterRoute',
-            'onContentPrepareForm' => 'onContentPrepareForm',
+            'onAfterRoute'                     => 'onAfterRoute',
+            'onContentPrepareForm'             => 'onContentPrepareForm',
+            'onInstallerBeforePackageDownload' => 'onInstallerBeforePackageDownload',
         ];
     }
 
@@ -66,8 +69,41 @@ final class Playground extends CMSPlugin implements SubscriberInterface
         // In the browser, PHP's HTTP requests go through fetch(), so a server must allow cross-origin requests. The list
         // of languages (update.joomla.org) does; the language packs (downloads.joomla.org) do not. Say so on the page,
         // next to Joomla's own "Error connecting to the server" after an attempt. With a CORS proxy, the downloads work.
-        if (empty($_SERVER['JOOMLA_PLAYGROUND_CORS_PROXY']) && $app->isClient('administrator') && $option === 'com_installer' && $view === 'languages') {
+        // (Unless the playground has the language packs itself, or a CORS proxy.)
+        if (empty($_SERVER['JOOMLA_PLAYGROUND_CORS_PROXY']) && empty($_SERVER['JOOMLA_PLAYGROUND_LANGUAGE_PACKS'])
+            && $app->isClient('administrator') && $option === 'com_installer' && $view === 'languages') {
             $app->enqueueMessage(Text::_('PLG_SYSTEM_PLAYGROUND_NO_LANGUAGE_DOWNLOADS'), 'warning');
+        }
+    }
+
+    /**
+     * The browser playground ships the accredited language packs with each Joomla bundle (joomla/<version>/languages/,
+     * see bin/download-language-packs.php), because a browser may not download them from downloads.joomla.org.
+     * When the installer downloads one of those packs (System > Install Languages), it gets the playground's copy:
+     * the same file, from the playground's own website.
+     */
+    public function onInstallerBeforePackageDownload(BeforePackageDownloadEvent $event): void
+    {
+        $bundle = $_SERVER['JOOMLA_PLAYGROUND_BUNDLE_URL'] ?? '';
+
+        if (($_SERVER['JOOMLA_PLAYGROUND'] ?? '') !== 'browser' || $bundle === '' || empty($_SERVER['JOOMLA_PLAYGROUND_LANGUAGE_PACKS'])) {
+            return;
+        }
+
+        static $packs = null;
+
+        try {
+            $packs ??= json_decode(HttpFactory::getHttp()->get($bundle . 'languages/index.json')->getBody(), true)['packs'] ?? [];
+        } catch (\Throwable) {
+            $packs = [];
+        }
+
+        foreach ($packs as $pack) {
+            if ($pack['downloadurl'] === $event->getUrl()) {
+                $event->updateUrl($bundle . 'languages/' . $pack['file']);
+
+                return;
+            }
         }
     }
 
