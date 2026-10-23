@@ -52,10 +52,12 @@ On the right:
 
 **Good to know**
 - Use a recent Chrome, Edge or other Chromium browser; Firefox and Safari are not tested yet.
+- **Languages:** System > Install Languages works. The playground has the accredited language packs on board, so
+  installing one takes a few seconds. `?language=nl-NL` starts a playground in that language (see below).
 - The site reaches the internet through your browser, so only servers that allow requests from other websites
-  (CORS) answer. System > Install Languages shows the list of languages, but the language packs themselves
-  cannot be downloaded from there: download the zip and use **Upload Package File**. A link or blueprint can
-  install extensions (see below).
+  (CORS) answer. Installing extensions from URLs or updating them mostly does not work: download the zip and use
+  System > Install > Extensions > **Upload Package File**. A link or blueprint can install extensions from hosts
+  that allow it (see below).
 - The Mail inbox keeps the mails until the page is reloaded.
 - Each tab is its own playground, with its own site and database.
 - Clearing your browser's site data for this address deletes the saved sites.
@@ -71,7 +73,7 @@ A link can say how a new playground should look. Add these to the address:
 | `url` | `?url=/index.php` | The page to open first; default `/administrator/` |
 | `login` | `?login=no` | Start logged out |
 | `extension` | `?extension=https://example.org/mod_hello.zip` | Install an extension package (repeatable) |
-| `language` | `?language=nl-NL` | Make an installed language the site's default |
+| `language` | `?language=nl-NL` | Install that language and make it the default of the site and the administrator |
 | `blueprint-url` | `?blueprint-url=https://example.org/blueprint.json` | Set up the site with a blueprint |
 
 A **blueprint** is a small JSON file with the steps to set up a site. It can also be put in the address
@@ -97,7 +99,7 @@ The steps:
 | `enableExtension` | `element`, `type`, `folder`, `client` | Enable an extension, e.g. `{"element": "debug", "type": "plugin", "folder": "system"}` |
 | `importSampleData` | `type` (default `blog`) | Install Joomla's sample data |
 | `setGlobalConfig` | `values` | Set Global Configuration options (properties of `configuration.php`) |
-| `setSiteLanguage` | `language`, `administrator` | Make an installed language the default |
+| `setSiteLanguage` | `language`, `administrator` | Make a language the default (its pack is installed if needed) |
 | `runSql` | `sql` | Run SQL statements (MySQL syntax; `#__` is the table prefix) |
 | `runPHP` | `code` | Run PHP code in the site's root folder |
 | `writeFile` | `path`, `data` | Write a file into the site |

@@ -9,7 +9,8 @@
 //   writeFile         { path, data }                   writes a file, path relative to the site's root
 //   unzip             { url, to? }                     unpacks a zip into a folder of the site
 //   importSampleData  { type? }                        installs Joomla's sample data ("blog", the default)
-//   setSiteLanguage   { language, administrator? }     makes an installed language the default of the site
+//   setSiteLanguage   { language, administrator? }     makes a language the default of the site (and of the
+//                                                      administrator); installs its pack first if needed
 //
 // URLs are relative to the blueprint. Downloads need CORS headers from the host, or the playground's CORS proxy.
 
@@ -25,6 +26,7 @@ export class BlueprintError extends Error {}
  * @param {Function} context.progress  (message) => void
  * @param {string}   context.baseUrl   URL the step URLs are relative to
  * @param {string}   [context.corsProxy] URL of a CORS proxy (proxy/cors-proxy.js)
+ * @param {string}   [context.languagePacks] URL of the bundle's language packs (<tag>.zip), if it has them
  */
 export async function runSteps(steps, context) {
   for (const [index, step] of steps.entries()) {
@@ -217,6 +219,11 @@ const STEPS = {
   },
 
   async setSiteLanguage({ language, administrator = false }, context) {
+    // A language pack the playground ships, installed when the language is not there yet (by the PHP below).
+    if (context.languagePacks && !(await languageInstalled(language, context))) {
+      await STEPS.installExtension({ url: new URL(`${language}.zip`, context.languagePacks).href }, context);
+    }
+
     const response = await context.runPhp(`
       ${joomlaPhp(context.root)}
       $language = ${phpString(language)};
@@ -237,10 +244,20 @@ const STEPS = {
     `);
 
     if (response.text.trim() === 'missing') {
-      throw new Error(`The language ${language} is not installed; install its package first (installExtension)`);
+      throw new Error(`The language ${language} is not installed, and the playground has no language pack for it`);
     }
   },
 };
+
+async function languageInstalled(language, context) {
+  const response = await context.runPhp(`
+    ${joomlaPhp(context.root)}
+    echo $db->setQuery($db->getQuery(true)->select('COUNT(*)')->from('#__extensions')
+        ->where("type = 'language'")->where('client_id = 0')->where('element = ' . $db->quote(${phpString(language)})))->loadResult();
+  `);
+
+  return Number(response.text.trim()) > 0;
+}
 
 /**
  * Downloads a file: directly, or through the CORS proxy when the host does not allow it.

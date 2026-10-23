@@ -153,18 +153,19 @@ describe('Joomla Playground in the browser', () => {
     // curl waited 300 s for a connection and every other request of the playground waited behind it.
     const started = Date.now();
     frame = await openInFrame('/administrator/index.php?option=com_installer&view=languages');
-    await frame.waitForSelector('text=language packs cannot be installed from this list', { timeout: 30000 });
+    await frame.waitForSelector('#installer-languages tbody tr .btn', { timeout: 30000 });
     console.log(`Install Languages took ${Date.now() - started} ms`);
 
-    // Installing one fails at once (downloads.joomla.org allows no cross-origin requests), and Joomla's redirect
-    // back to the list stays in this playground's scope.
-    const install = frame.locator('#installer-languages tbody tr .btn').first();
+    // With the language packs in the bundle (npm run bundle downloads them), installing one takes the playground's
+    // copy. Without them, it fails at once (downloads.joomla.org allows no cross-origin requests) and the page says
+    // so. Either way, Joomla's redirect back to the list stays in this playground's scope.
+    const withPacks = playground.manifest.languages > 0;
+    const install = frame.locator('#installer-languages tbody tr .btn[aria-label*="Dutch"]').first();
 
-    if (await install.count()) {
-      await Promise.all([frame.waitForNavigation({ timeout: 30000 }), install.click()]);
-      await frame.waitForSelector('text=language packs cannot be installed from this list', { timeout: 30000 });
-      assert.ok(frame.url().startsWith(`${playground.siteUrl}/administrator/`), frame.url());
-    }
+    assert.equal(await frame.locator('text=language packs cannot be installed from this list').count(), withPacks ? 0 : 1);
+    await Promise.all([frame.waitForNavigation({ timeout: 60000 }), install.click()]);
+    await frame.waitForSelector(withPacks ? 'text=Installation of the language pack was successful' : 'text=language packs cannot be installed from this list', { timeout: 60000 });
+    assert.ok(frame.url().startsWith(`${playground.siteUrl}/administrator/`), frame.url());
 
     assert.equal(await page.evaluate(async (siteUrl) => (await fetch(`${siteUrl}/index.php`)).status, playground.siteUrl), 200);
   });
@@ -456,6 +457,27 @@ describe('Blueprints', () => {
     await missing.waitForSelector('#status.error', { timeout: 60000 });
     assert.match(await missing.locator('#status').textContent(), /Joomla 3 is not available/);
     await missing.close();
+  });
+
+  test('?language= installs a language pack and makes it the default', async () => {
+    const tab = await context.newPage();
+
+    await tab.goto(`${appUrl}?language=nl-NL`);
+
+    const result = await waitForPlayground(tab);
+
+    if (!result.manifest.languages) {
+      await tab.close();
+
+      return;
+    }
+
+    assert.equal(result.blueprintError, null);
+
+    const html = await tab.evaluate(async (siteUrl) => (await fetch(`${siteUrl}/administrator/index.php`)).text(), result.siteUrl);
+
+    assert.match(html, /<html[^>]* lang="nl-nl"/, 'The administrator is in Dutch');
+    await tab.close();
   });
 
   test('reports a wrong blueprint', async () => {

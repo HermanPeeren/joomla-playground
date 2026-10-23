@@ -123,7 +123,9 @@ async function boot({ base, scope, joomla, site = null, title = null, zip = null
 
   // php.ini settings, before PHP runs anything.
   await enableNetwork(php, caRoot);
-  await prependFile(php, { sitePath: new URL(siteUrl).pathname, hasCorsProxy: Boolean(corsProxy), password });
+  const bundleUrl = new URL(`joomla/${joomla}/`, base).href;
+
+  await prependFile(php, { sitePath: new URL(siteUrl).pathname, hasCorsProxy: Boolean(corsProxy), password, bundleUrl, languagePacks: manifest.languages ?? 0 });
   await setPhpIniEntries(php, { sendmail_path: '/usr/sbin/sendmail -t -i' });
 
   progress(meta ? 'Opening the saved site' : 'Unpacking Joomla');
@@ -241,6 +243,7 @@ async function boot({ base, scope, joomla, site = null, title = null, zip = null
         progress,
         corsProxy,
         baseUrl: blueprint.baseUrl ?? base,
+        languagePacks: manifest.languages ? new URL('languages/', bundleUrl).href : null,
         request: (url, init = {}) => state.handler.request({ url, ...init }),
         runPhp: (code) => runPhp(php, code),
         logIn: () => logIn(state.handler, siteUrl, password),
@@ -687,7 +690,7 @@ async function enableNetwork(php, caRoot) {
  * would leave the scope and end on a 404 of the web server. A file PHP runs before every script corrects it, and
  * tells the playground's system plugin that it runs in the browser.
  */
-async function prependFile(php, { sitePath, hasCorsProxy, password }) {
+async function prependFile(php, { sitePath, hasCorsProxy, password, bundleUrl, languagePacks }) {
   // The Super User's account, for the notice on the login form (plg_system_playground). It is this playground's
   // random password, which the toolbar shows anyway.
   php.writeFile(PREPEND_FILE, `<?php
@@ -695,6 +698,8 @@ async function prependFile(php, { sitePath, hasCorsProxy, password }) {
     $_SERVER['JOOMLA_PLAYGROUND_CORS_PROXY'] = ${hasCorsProxy ? "'1'" : "''"};
     $_SERVER['JOOMLA_PLAYGROUND_USERNAME'] = 'admin';
     $_SERVER['JOOMLA_PLAYGROUND_PASSWORD'] = ${JSON.stringify(password)};
+    $_SERVER['JOOMLA_PLAYGROUND_BUNDLE_URL'] = ${JSON.stringify(bundleUrl)};
+    $_SERVER['JOOMLA_PLAYGROUND_LANGUAGE_PACKS'] = ${JSON.stringify(String(languagePacks))};
     $prefix = ${JSON.stringify(sitePath)};
     if (isset($_SERVER['SCRIPT_NAME']) && !str_starts_with($_SERVER['SCRIPT_NAME'], $prefix . '/')) {
         $_SERVER['SCRIPT_NAME'] = $prefix . $_SERVER['SCRIPT_NAME'];
