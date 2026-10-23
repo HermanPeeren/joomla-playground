@@ -3,6 +3,8 @@
 //   installExtension  { url }                          installs an extension package (zip) with Joomla's installer
 //   enableExtension   { element, type?, folder?, client?, params? }   e.g. { element: "debug", type: "plugin",
 //                                                      folder: "system" }; params are merged into the extension's
+//   disableExtension  { element, type?, folder?, client? }   the opposite of enableExtension
+//   indexSmartSearch  { }                              builds the Smart Search index, like its Index button
 //   installLanguage   { language, publish? }           installs a language pack the playground ships, and
 //                                                      publishes its content language (publish: false does not)
 //   addModule         { module, title, position, client?, params?, language?, showtitle?, ordering? }
@@ -21,6 +23,8 @@
 //                                                      that works like it, with extra query parameters
 //   setSiteLanguage   { language, administrator? }     makes a language the default of the site (and of the
 //                                                      administrator); installs its pack first if needed
+//
+// Any step can have "background": true: it then runs after the playground is ready, between the page's requests.
 //
 // URLs are relative to the blueprint. Downloads need CORS headers from the host, or the playground's CORS proxy.
 
@@ -124,6 +128,59 @@ const STEPS = {
     if (Number(response.text) < 1) {
       throw new Error(`No extension "${element}" found`);
     }
+  },
+
+  async disableExtension({ element, type = null, folder = null, client = null }, context) {
+    const response = await context.runPhp(`
+      ${joomlaPhp(context.root)}
+      $query = $db->getQuery(true)->update('#__extensions')->set('enabled = 0')->where('element = ' . $db->quote(${phpString(element)}));
+      ${type ? `$query->where('type = ' . $db->quote(${phpString(type)}));` : ''}
+      ${folder ? `$query->where('folder = ' . $db->quote(${phpString(folder)}));` : ''}
+      ${client ? `$query->where('client_id = ' . ${client === 'administrator' ? 1 : 0});` : ''}
+      $db->setQuery($query)->execute();
+      echo $db->getAffectedRows();
+    `);
+
+    if (Number(response.text) < 1) {
+      throw new Error(`No extension "${element}" found`);
+    }
+  },
+
+  async indexSmartSearch(step, context) {
+    const token = csrfToken(await context.request(`${context.siteUrl}/administrator/index.php?option=com_finder&view=index`), 'Smart Search');
+    const task = async (name) => {
+      const response = await context.request(`${context.siteUrl}/administrator/index.php?option=com_finder&tmpl=component&format=json&task=indexer.${name}&${token}=1`);
+      const start = response.text.indexOf('{');
+
+      try {
+        return JSON.parse(response.text.slice(Math.max(0, start)));
+      } catch {
+        throw new Error(`Smart Search ${name} gave no JSON (HTTP ${response.httpStatusCode}): ${plainText(response.text)}`);
+      }
+    };
+
+    // Like the Index button (media/com_finder/js/indexer.js): start, batches until all items are done, optimize.
+    // Each is a request of its own: in the background, the page's requests come in between.
+    const started = await task('start');
+    let offset = 0;
+
+    if (started.error) {
+      throw new Error(started.header ?? started.message ?? 'Smart Search could not start');
+    }
+
+    while (offset < (started.totalItems ?? 0)) {
+      context.progress(`Smart Search index: ${offset} of ${started.totalItems} items`);
+
+      const batch = await task('batch');
+
+      if (batch.error || !batch.batchOffset) {
+        throw new Error(batch.header ?? batch.message ?? `Smart Search stopped at ${offset} of ${started.totalItems} items`);
+      }
+
+      offset += batch.batchOffset;
+    }
+
+    await task('optimize');
   },
 
   async installLanguage({ language, publish = true }, context) {

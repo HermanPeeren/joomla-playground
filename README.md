@@ -14,8 +14,9 @@ sent to a server.
 - **Multilingual site:** <https://hermanpeeren.github.io/joomla-playground/?blueprint=heritage-demo>. A site in
   English, Dutch, German, French and Spanish, with content about UNESCO World Heritage sites from the
   [demonstration data](https://github.com/ceford/cefjdemos-plg-demodata) of Clifford E Ford. An article on its
-  home page explains how a multilingual Joomla site works. Setting it up takes about 1.5 minutes: the blueprint
-  installs everything in your browser.
+  home page explains how a multilingual Joomla site works. Setting it up takes about 45 seconds: the blueprint
+  installs everything in your browser. Then the Smart Search index is built for about a minute, while you can
+  already look around; the toolbar shows its progress.
 
 ## Logging in
 
@@ -118,6 +119,11 @@ The steps:
 | `addModule` | `module`, `title`, `position`, `client`, `params`, `language` | Publish a module on all pages |
 | `addArticle` | `title`, `text`, `category`, `language`, `featured` | Add a published article |
 | `addUserGroup` | `title`, `parent` | Add a user group |
+| `disableExtension` | `element`, `type`, `folder`, `client` | Disable an extension |
+| `indexSmartSearch` | | Build the Smart Search index, like its Index button |
+
+Any step can have `"background": true`: it then runs after the playground is ready, while you use it, and the
+toolbar shows its progress.
 
 Downloads (`extension`, `installExtension`, `unzip`) need a host that allows it (CORS headers), such as
 GitHub Pages or raw.githubusercontent.com; release downloads on GitHub do not. URLs in a blueprint are relative

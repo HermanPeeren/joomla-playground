@@ -22,6 +22,8 @@ export const DEFAULT_PHP_VERSION = '8.4';
 export const STEPS = {
   installExtension: ['url'],
   enableExtension: ['element'],
+  disableExtension: ['element'],
+  indexSmartSearch: [],
   installLanguage: ['language'],
   addModule: ['module', 'title', 'position'],
   addArticle: ['title', 'text'],

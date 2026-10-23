@@ -223,31 +223,36 @@ async function boot({ base, scope, joomla, site = null, title = null, zip = null
     await writeMeta(site, { ...meta, php: phpVersion, opened: new Date().toISOString() });
   }
 
-  // A blueprint sets up a new playground only; a saved site is opened as it was.
-  const steps = meta ? [] : (blueprint?.steps ?? []);
+  // A blueprint sets up a new playground only; a saved site is opened as it was. Steps with "background": true run
+  // after the playground is ready, between the requests of the page.
+  const allSteps = meta ? [] : (blueprint?.steps ?? []);
+  const steps = allSteps.filter((step) => !step.background);
+  const backgroundSteps = allSteps.filter((step) => step.background);
   const login = blueprint?.login !== false;
   let blueprintError = null;
 
-  if (login || steps.length) {
+  if (login || allSteps.length) {
     progress('Logging in');
     await logIn(state.handler, siteUrl, password);
     lap('login');
   }
 
+  const stepContext = (handler, run) => ({
+    php,
+    siteUrl,
+    root: DOCUMENT_ROOT,
+    corsProxy,
+    baseUrl: blueprint.baseUrl ?? base,
+    languagePacks: manifest.languages ? new URL('languages/', bundleUrl).href : null,
+    request: (url, init = {}) => run(() => handler.request({ url, ...init })),
+    runPhp: (code) => run(() => runPhp(php, code)),
+    logIn: () => run(() => logIn(handler, siteUrl, password)),
+  });
+  const stepHandler = state.handler;
+
   if (steps.length) {
     try {
-      await runSteps(steps, {
-        php,
-        siteUrl,
-        root: DOCUMENT_ROOT,
-        progress,
-        corsProxy,
-        baseUrl: blueprint.baseUrl ?? base,
-        languagePacks: manifest.languages ? new URL('languages/', bundleUrl).href : null,
-        request: (url, init = {}) => state.handler.request({ url, ...init }),
-        runPhp: (code) => runPhp(php, code),
-        logIn: () => logIn(state.handler, siteUrl, password),
-      });
+      await runSteps(steps, { ...stepContext(stepHandler, (task) => task()), progress });
     } catch (error) {
       if (!(error instanceof BlueprintError)) {
         throw error;
@@ -270,6 +275,22 @@ async function boot({ base, scope, joomla, site = null, title = null, zip = null
 
   lap('ready');
   scheduleSnapshot();
+
+  if (backgroundSteps.length) {
+    // Through the request queue, so the page's own requests get their turn in between. The pause lets a request
+    // from the service worker (a message event) join the queue first: without it, the next background request would
+    // always be queued at once, and the page would wait until all background steps are done.
+    const queued = async (task) => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      return serialized(task).finally(scheduleSnapshot);
+    };
+    const notice = (message) => self.postMessage({ type: 'background', message });
+
+    runSteps(backgroundSteps, { ...stepContext(stepHandler, queued), progress: notice })
+      .then(() => notice(null))
+      .catch((error) => notice(String(error?.message ?? error)));
+  }
 
   channel.onmessage = ({ data }) => {
     if (data?.type === 'request' && data.scope === scope) {

@@ -514,6 +514,17 @@ describe('Blueprints', () => {
       assert.ok(pages[code].items > 1, `${code}: the heritage articles are there (${pages[code].items})`);
     }
 
+    // The Smart Search index is built in the background (a blueprint step with "background": true); the toolbar
+    // shows its progress after "Ready in ...".
+    await tab.waitForFunction(() => !document.querySelector('#status').textContent.includes('·'), null, { timeout: 300000 });
+    assert.doesNotMatch(await tab.locator('#status').textContent(), /error|failed/i);
+
+    const found = await tab.evaluate(
+      async (siteUrl) => (await (await fetch(`${siteUrl}/index.php/en/?option=com_finder&view=search&q=Frogs`)).text()).includes('November: Frogs'),
+      result.siteUrl
+    );
+
+    assert.ok(found, 'Smart Search finds a heritage article');
     await tab.close();
   });
 
