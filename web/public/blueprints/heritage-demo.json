@@ -47,6 +47,11 @@
       }
     },
     {
+      "step": "writeFile",
+      "path": "media/templates/site/cassiopeia/css/user.css",
+      "data": "/* Joomla Playground, heritage demo: the language switcher (position topbar) on the row of the site name, at the\n   right. The header becomes a one-column grid; the switcher and the site name share its second row. On narrow\n   screens the switcher stays above the site name, as Cassiopeia has it. */\n@media (width >= 768px) {\n  .container-header:has(.container-topbar .mod-languages) {\n    display: grid;\n    grid-template-columns: minmax(0, 1fr);\n  }\n\n  .container-header:has(.container-topbar .mod-languages) > .grid-child:has(.navbar-brand),\n  .container-header:has(.container-topbar .mod-languages) > .container-topbar {\n    grid-row: 2;\n    grid-column: 1;\n  }\n\n  .container-header .container-topbar:has(.mod-languages) {\n    display: flex;\n    justify-content: flex-end;\n    align-items: center;\n    align-self: center;\n    width: 100%;\n    max-width: 1320px;\n    margin: 0 auto;\n    padding: .5em;\n    background: none;\n    /* Above the site name's row, which shares the cell; the site name's link stays clickable under the empty\n       part of this row. */\n    position: relative;\n    z-index: 1;\n    pointer-events: none;\n  }\n\n  .container-header .container-topbar .mod-languages {\n    pointer-events: auto;\n  }\n}\n"
+    },
+    {
       "step": "installExtension",
       "url": "assets/cefjdemos/mod_demodata.zip"
     },

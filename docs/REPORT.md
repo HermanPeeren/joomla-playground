@@ -1006,6 +1006,12 @@ every visitor.
   which serves the site's own files. This affected every extension with its own CSS or JavaScript. (The demo's
   blueprint did not notice: it runs the install steps itself instead of clicking the button.) The browser test
   loads the module's script.
+- **The language switcher next to the site name:** Cassiopeia has no module position on the row of the site
+  name; `topbar` is a row above it. The blueprint writes Cassiopeia's `user.css` (which Joomla loads by itself,
+  as the asset `template.user`). From 768 px wide, the header becomes a one-column grid, and the switcher shares
+  the site name's row, at the right. The switcher's row lies on top, so the flags can be clicked, with
+  `pointer-events: none` on its empty part, so the site name's link works too. On narrow screens the switcher
+  stays above the site name. The browser test checks that every flag can be clicked.
 - **The explanatory article is out:** in English only, it was not a good example on a site in five languages. Its
   text is kept in `docs/demos/heritage-demo-article.html`, to come back later, preferably translated into each
   content language and linked as associations.

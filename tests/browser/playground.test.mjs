@@ -576,6 +576,21 @@ describe('Blueprints', () => {
       assert.equal(script.status, 200);
       assert.match(script.type, /javascript/);
       assert.ok(script.demodata, "The module's own script");
+
+      // The language switcher on the row of the site name (user.css of the blueprint): every flag can be clicked.
+      const frame = await (await tab.waitForSelector('#joomla')).contentFrame();
+
+      await frame.goto(`${result.siteUrl}/index.php/de/`);
+
+      const flags = await frame.evaluate(() =>
+        [...document.querySelectorAll('.mod-languages a')].map((link) => {
+          const box = link.getBoundingClientRect();
+
+          return link.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+        })
+      );
+
+      assert.deepEqual(flags, [true, true, true, true, true], 'Every flag of the language switcher can be clicked');
     } finally {
       await tab.close();
       // The next build makes its own (npm run demos).
