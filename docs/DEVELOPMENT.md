@@ -61,6 +61,14 @@ Then open http://localhost:5400/.
   `--version=<version>` rebuilds one.
 - To offer another Joomla version, add it to `joomla-versions.json`; `default` is the version a new playground
   gets. The integration tests use `JOOMLA_VERSION` (`phpunit.xml.dist`, CI).
+- `npm run joomla:versions` (`scripts/update-joomla-versions.mjs`) moves every version in the list to the newest
+  stable release of its major version. The default becomes the release GitHub marks as Latest, and
+  `JOOMLA_VERSION` follows it; `-- --check` only reports.
+- The **Joomla versions** workflow (`.github/workflows/joomla-versions.yml`) runs it every day. On new releases it
+  pushes a branch and opens a pull request (the repository allows it: Settings > Actions >
+  General > "Allow GitHub Actions to create and approve pull requests"; without it, an issue with a
+  compare link). CI does not start by itself on a pull request opened by the workflow: close and reopen it.
+  After merging, run **Deploy the playground**.
 - `npm run web:dev` serves the playground.
 - `npm run web:build` writes a static site to `web/dist/`, which any static web server can host. Service workers
   need `localhost` or HTTPS.

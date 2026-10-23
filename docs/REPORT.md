@@ -836,7 +836,22 @@ The browser suite does not use the internet, so the end-to-end check is not in C
 **Not done:** deploying the proxy (needs a Cloudflare account). Until then, the public playground cannot install
 language packs from Install Languages.
 
-## 21. Sources
+## 21. Phase 2, part 8: keeping the Joomla versions up to date (2026-10-23)
+
+The playground offers the newest stable release of each Joomla major version in `joomla-versions.json`.
+- `scripts/update-joomla-versions.mjs` (`npm run joomla:versions`) reads the releases of joomla/joomla-cms
+  from the GitHub API. It moves every listed version to the newest stable release of its major version, and the
+  default to the release GitHub marks as Latest. A new major version that becomes Latest is added. The integration
+  tests' `JOOMLA_VERSION` (`phpunit.xml.dist`, the CI workflow) follows the default.
+- The **Joomla versions** workflow runs it every day. When something changed, it pushes a branch
+  `joomla-versions/<versions>` and opens a pull request, or an issue with a compare link if the repository does
+  not let workflows open pull requests. The repository allows it since 2026-10-23.
+- A pull request opened with the workflow's own token does not start the CI workflow; closing and reopening it
+  does. After merging, the Pages workflow publishes the new bundles.
+- **Tests:** four unit tests of the version choice (`npm run test:scripts`), in CI. On 2026-10-23 the list was up to
+  date: 6.2.0 (default) and 5.4.10.
+
+## 22. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)
