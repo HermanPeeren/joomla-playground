@@ -25,7 +25,7 @@ runtime (`@php-wasm/*`) instead of rebuilding it.
    - Database before WASM, Node before browser, a minimal page before UI polish.
 5. **Everything is GPL-2.0-or-later**, compatible with Joomla and the Playground packages.
 
-## Phase 0: decisions and setup (½ day)
+## Phase 0: decisions and setup
 
 - Repository name and location (e.g. `joomla-playground` under a personal GitHub account first, perhaps
   `joomla-projects` later).
@@ -35,7 +35,7 @@ runtime (`@php-wasm/*`) instead of rebuilding it.
 - Pin versions: Joomla 6.2.0 Full Package, `@php-wasm/*` 3.1.x, PHP 8.4.
 - Local test site under a git-ignored `/joomla` folder, per the usual conventions.
 
-## Phase 1: proof of concept (≈ 2–3 weeks)
+## Phase 1: proof of concept
 
 ### Step 1a: Joomla on SQLite, natively (no WASM) · *highest risk, do first*
 
@@ -72,7 +72,7 @@ Left over for later:
 - Smoke-test the Web Services API.
 - Decide on case-insensitive comparisons (MySQL) versus case-sensitive ones (PostgreSQL, current).
 
-### Step 1b: spike MySQL emulation (Option C) · *1–2 days, parallel with 1a*
+### Step 1b: spike MySQL emulation (Option C)
 
 - Vendor `WordPress/sqlite-database-integration/packages/mysql-on-sqlite`.
 - Write a minimal Joomla `MysqlDriver`-style subclass that uses `WP_MySQL_On_SQLite`. It inlines bound
@@ -93,7 +93,7 @@ unchanged.
   acceptable, C becomes the default and A the fast fallback.
 - **Follow-up:** report the emulator gaps upstream (WordPress/sqlite-database-integration).
 
-### Step 2: Joomla in `@php-wasm/node` · *1–2 days*
+### Step 2: Joomla in `@php-wasm/node`
 
 - A small Node script:
   - `loadNodeRuntime('8.4')`;
@@ -122,7 +122,7 @@ unchanged.
   - Find out why OPcache does not report itself active, and try JSPI builds; both are speed levers.
   - Load the site into MEMFS instead of NODEFS.
 
-### Step 3: Joomla in the browser · *3–5 days*
+### Step 3: Joomla in the browser
 
 **Done, first version (2026-10-22)** (REPORT §12).
 - **What works:** `web/` runs Joomla in a browser tab. It is ready about 2 s after the page loads (locally) and
@@ -156,7 +156,7 @@ unchanged.
 the list of core/framework issues. Good material for a JoomlaDay talk or Joomla Magazine article, and a
 pitch to the Joomla production department.
 
-## Phase 2: MVP (≈ 1–2 months, part-time)
+## Phase 2: MVP
 
 - **Persistence:** save to OPFS ("My playgrounds"), export and import as a zip.
   - **Done (2026-10-22)** (REPORT §13): Save…, reopen with `?site=`, My sites, Export, Import, New; one tab
@@ -192,7 +192,7 @@ pitch to the Joomla production department.
   - **Done (2026-10-22)** (REPORT §17): PHP version picker, Start over; Export and Site/Administrator were
     already there. The Joomla version picker came with part 6.
 
-## Phase 3: ecosystem (later)
+## Phase 3: ecosystem
 
 - **CLI:** `npx joomla-playground` with `@php-wasm/node`, mounting an extension folder for development.
 - **joomla-cms PR previews:**
