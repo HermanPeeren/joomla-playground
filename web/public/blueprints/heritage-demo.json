@@ -2,7 +2,8 @@
   "meta": {
     "title": "Multilingual demo: UNESCO World Heritage",
     "description": "A Joomla site in English, Dutch, German, French and Spanish, with the heritage dataset of Clifford E Ford's demonstration data plugin.",
-    "author": "Joomla Playground"
+    "author": "Joomla Playground",
+    "prebuild": true
   },
   "preferredVersions": {
     "joomla": "6.2"

@@ -142,7 +142,7 @@ async function boot(options = {}, transfer = []) {
 
 function show(path = '/administrator/') {
   const seconds = (playground.timings.ready / 1000).toFixed(1);
-  const where = playground.site ? `saved as "${playground.site}"` : 'temporary';
+  const where = playground.site ? `saved as "${playground.site}"` : playground.prebuilt ? 'temporary, prebuilt demo' : 'temporary';
 
   readyStatus = `Ready in ${seconds} s (${where})`;
   setStatus(backgroundStatus ? `${readyStatus} · ${backgroundStatus}` : readyStatus);
@@ -426,6 +426,45 @@ async function newestServiceWorker(registration) {
   await navigator.serviceWorker.ready;
 }
 
+/**
+ * The prebuilt export of one of the playground's own blueprints (web/dist/demos/, see scripts/build-demos.mjs), when
+ * it was made from this version of the blueprint. Not with ?fresh, nor when the URL changes the blueprint.
+ *
+ * @returns {Promise<{bytes: ArrayBuffer, joomla: string}|null>}
+ */
+async function prebuiltDemo(blueprint, url) {
+  const name = blueprint?.source?.name;
+  const changed = ['fresh', 'php', 'joomla', 'url', 'login', 'extension', 'language'].some((key) => url.searchParams.has(key));
+
+  if (!name || changed || url.hash.length > 1) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(new URL(`demos/${name}.json`, base));
+    const demo = response.ok ? await response.json() : null;
+
+    if (demo?.blueprint !== blueprint.source.sha256) {
+      return null;
+    }
+
+    setStatus('Downloading the prebuilt demo');
+
+    const zip = await fetch(new URL(`demos/${name}.zip`, base));
+
+    if (!zip.ok) {
+      return null;
+    }
+
+    const joomla = bundles.versions.some((bundle) => bundle.joomla === demo.joomla) ? demo.joomla : bundles.default;
+
+    return { bytes: await zip.arrayBuffer(), joomla };
+  } catch {
+    // No prebuilt demo (e.g. vite's fallback page instead of JSON): run the blueprint.
+    return null;
+  }
+}
+
 function startOver() {
   if (confirm('Throw this playground away and start again from the same link?')) {
     location.reload();
@@ -469,6 +508,19 @@ async function start() {
   const url = new URL(location.href);
   const site = url.searchParams.get('site');
   const blueprint = await blueprintFromUrl(url);
+  const prebuilt = site ? null : await prebuiltDemo(blueprint, url);
+
+  if (prebuilt) {
+    // The site the blueprint makes, exported at build time: start from it, like an import, without the steps.
+    await boot(
+      { zip: prebuilt.bytes, joomla: prebuilt.joomla, php: blueprint.preferredVersions?.php ?? null, blueprint: { landingPage: blueprint.landingPage, login: blueprint.login, steps: [] } },
+      [prebuilt.bytes]
+    );
+    playground.prebuilt = blueprint.source.name;
+    show(playground.landingPage ?? '/administrator/');
+
+    return;
+  }
 
   const { joomla, warning } = await chooseJoomla(site, blueprint);
 

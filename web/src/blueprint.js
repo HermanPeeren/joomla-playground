@@ -64,8 +64,17 @@ export async function blueprintFromUrl(url) {
       throw new Error(`Cannot download the blueprint ${source}: HTTP ${response.status}`);
     }
 
-    blueprint = parseJson(await response.text(), `the blueprint ${source}`);
+    const text = await response.text();
+
+    blueprint = parseJson(text, `the blueprint ${source}`);
     blueprint.baseUrl = source.href;
+
+    // A blueprint of the playground may have a prebuilt export (scripts/build-demos.mjs), made from this very file.
+    if (name) {
+      const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
+
+      blueprint.source = { name, sha256: Array.from(hash, (byte) => byte.toString(16).padStart(2, '0')).join('') };
+    }
   }
 
   const shortcuts = {
@@ -120,7 +129,7 @@ export function validate(blueprint) {
   }
 
   for (const key of Object.keys(blueprint)) {
-    if (!KEYS.includes(key) && key !== 'baseUrl') {
+    if (!KEYS.includes(key) && key !== 'baseUrl' && key !== 'source') {
       throw new Error(`Unknown blueprint property "${key}"; known: ${KEYS.join(', ')}`);
     }
   }
