@@ -1,0 +1,30 @@
+{
+  "cefjdemos/mod_demodata.zip": {
+    "url": "https://github.com/ceford/cefjdemos-mod-demodata/archive/refs/heads/main.zip",
+    "folder": "mod_demodata"
+  },
+  "cefjdemos/plg_demodata_features101.zip": {
+    "url": "https://github.com/ceford/cefjdemos-plg-demodata/archive/refs/heads/main.zip",
+    "folder": "features101",
+    "patches": [
+      {
+        "file": "src/Extension/Features101.php",
+        "replace": "createModel('NewsFeed', 'Administrator'",
+        "with": "createModel('Newsfeed', 'Administrator'",
+        "why": "the class is NewsfeedModel: on a case-sensitive file system 'NewsFeed' finds no model"
+      },
+      {
+        "file": "src/Extension/Features101.php",
+        "replace": "$playwright_id = $db->loadResult();\n",
+        "with": "$playwright_id = $db->loadResult();\n\n        // Not every dataset has these users.\n        if (!$superman_id || !$playwright_id) {\n            return;\n        }\n",
+        "why": "the heritage dataset has no users superman and playwright, so the private message query was invalid SQL"
+      },
+      {
+        "file": "src/Extension/Features101.php",
+        "replace": "        $johndoe_id = $db->loadResult();\n\n        $query = $db->createQuery();\n        if (empty($is_installed)) {\n            // Add a record\n            $pp",
+        "with": "        $johndoe_id = $db->loadResult();\n\n        // Not every dataset has this user.\n        if (!$johndoe_id) {\n            return;\n        }\n\n        $query = $db->createQuery();\n        if (empty($is_installed)) {\n            // Add a record\n            $pp",
+        "why": "the heritage dataset has no user johndoe, so the privacy consent stored '' as a user id"
+      }
+    ]
+  }
+}

@@ -85,6 +85,16 @@ Then open http://localhost:5400/.
 - Blueprints: `web/src/blueprint.js` reads them from the URL, `web/src/blueprint-steps.js` runs the steps in
   the PHP worker.
 
+## The playground's own blueprints
+
+`web/public/blueprints/<name>.json` is started with `?blueprint=<name>`; `heritage-demo.json` is the multilingual
+demo. Extensions they install from hosts a browser may not download from (GitHub archives and releases) are
+listed in `web/public/blueprints/assets.json`. `npm run bundle` downloads them into `web/public/blueprints/assets/`
+(`bin/download-blueprint-assets.php`); the blueprint then installs `assets/...` from the playground's own website.
+- `folder` repacks one folder of a GitHub archive as an installable package.
+- `patches` correct known bugs of a package until its author fixes them; each says why. A patch whose text is
+  gone is skipped with a notice, so a fix upstream does not break the build.
+
 ## The CORS proxy
 
 Browsers only download from hosts that send CORS headers. Joomla's downloads and GitHub release assets do not,

@@ -1,14 +1,24 @@
 // The steps of a blueprint (see blueprint.js), run by the PHP worker on a new playground, logged in as Super User.
 //
 //   installExtension  { url }                          installs an extension package (zip) with Joomla's installer
-//   enableExtension   { element, type?, folder?, client? }   e.g. { element: "debug", type: "plugin", folder: "system" }
+//   enableExtension   { element, type?, folder?, client?, params? }   e.g. { element: "debug", type: "plugin",
+//                                                      folder: "system" }; params are merged into the extension's
+//   installLanguage   { language, publish? }           installs a language pack the playground ships, and
+//                                                      publishes its content language (publish: false does not)
+//   addModule         { module, title, position, client?, params?, language?, showtitle?, ordering? }
+//                                                      publishes a module on all pages; for an administrator module,
+//                                                      it uses the instance its install left without a position
+//   addArticle        { title, text, alias?, category?, language?, featured? }   saves an article, published
+//   addUserGroup      { title, parent? }               adds a user group (parent: a group title, default Registered)
 //   login             { }                              logs in as the Super User (done by default)
 //   setGlobalConfig   { values: { sef: false, ... } }  sets properties of configuration.php
 //   runPHP            { code }                         runs PHP code in the site's root folder
 //   runSql            { sql }                          runs SQL statements on Joomla's database (MySQL syntax, #__ prefix)
 //   writeFile         { path, data }                   writes a file, path relative to the site's root
 //   unzip             { url, to? }                     unpacks a zip into a folder of the site
-//   importSampleData  { type? }                        installs Joomla's sample data ("blog", the default)
+//   importSampleData  { type?, group?, query? }        installs Joomla's sample data ("blog", the default); with
+//                                                      group (e.g. "demodata"), the data of another plugin group
+//                                                      that works like it, with extra query parameters
 //   setSiteLanguage   { language, administrator? }     makes a language the default of the site (and of the
 //                                                      administrator); installs its pack first if needed
 //
@@ -92,20 +102,149 @@ const STEPS = {
     }
   },
 
-  async enableExtension({ element, type = null, folder = null, client = null }, context) {
+  async enableExtension({ element, type = null, folder = null, client = null, params = null }, context) {
+    context.php.writeFile('/tmp/blueprint.json', JSON.stringify(params ?? {}));
     const response = await context.runPhp(`
       ${joomlaPhp(context.root)}
-      $query = $db->getQuery(true)->update('#__extensions')->set('enabled = 1')->where('element = ' . $db->quote(${phpString(element)}));
+      $params = json_decode(file_get_contents('/tmp/blueprint.json'), true);
+      unlink('/tmp/blueprint.json');
+      $query = $db->getQuery(true)->select('extension_id, params')->from('#__extensions')->where('element = ' . $db->quote(${phpString(element)}));
       ${type ? `$query->where('type = ' . $db->quote(${phpString(type)}));` : ''}
       ${folder ? `$query->where('folder = ' . $db->quote(${phpString(folder)}));` : ''}
       ${client ? `$query->where('client_id = ' . ${client === 'administrator' ? 1 : 0});` : ''}
-      $db->setQuery($query)->execute();
-      echo $db->getAffectedRows();
+      $rows = $db->setQuery($query)->loadObjectList();
+      foreach ($rows as $row) {
+          $merged = array_merge(json_decode((string) $row->params, true) ?: [], $params);
+          $db->setQuery($db->getQuery(true)->update('#__extensions')->set('enabled = 1')
+              ->set('params = ' . $db->quote(json_encode($merged)))->where('extension_id = ' . (int) $row->extension_id))->execute();
+      }
+      echo count($rows);
     `);
 
     if (Number(response.text) < 1) {
       throw new Error(`No extension "${element}" found`);
     }
+  },
+
+  async installLanguage({ language, publish = true }, context) {
+    if (!(await languageInstalled(language, context))) {
+      if (!context.languagePacks) {
+        throw new Error(`The playground has no language packs; install ${language} with installExtension`);
+      }
+
+      await STEPS.installExtension({ url: new URL(`${language}.zip`, context.languagePacks).href }, context);
+    }
+
+    // Installing a language pack creates its content language, unpublished.
+    if (publish) {
+      await context.runPhp(`
+        ${joomlaPhp(context.root)}
+        $db->setQuery($db->getQuery(true)->update('#__languages')->set('published = 1')
+            ->where('lang_code = ' . $db->quote(${phpString(language)})))->execute();
+      `);
+    }
+  },
+
+  async addModule({ module, title, position, client = 'site', params = {}, language = '*', showtitle = true, ordering = 0 }, context) {
+    context.php.writeFile('/tmp/blueprint.json', JSON.stringify({ module, title, position, params, language, showtitle, ordering, client: client === 'administrator' ? 1 : 0 }));
+    const response = await context.runPhp(`
+      ${joomlaPhp(context.root)}
+      $spec = json_decode(file_get_contents('/tmp/blueprint.json'), true);
+      unlink('/tmp/blueprint.json');
+      if (!$db->setQuery($db->getQuery(true)->select('COUNT(*)')->from('#__extensions')
+          ->where("type = 'module'")->where('element = ' . $db->quote($spec['module'])))->loadResult()) {
+          echo 'missing';
+          return;
+      }
+      $module = (object) [
+          'title'     => $spec['title'],
+          'position'  => $spec['position'],
+          'module'    => $spec['module'],
+          'published' => 1,
+          'access'    => 1,
+          'showtitle' => $spec['showtitle'] ? 1 : 0,
+          'params'    => json_encode((object) $spec['params']),
+          'client_id' => $spec['client'],
+          'language'  => $spec['language'],
+          'ordering'  => (int) $spec['ordering'],
+      ];
+      // Installing an administrator module leaves an unpublished instance without a position: use that one.
+      $module->id = (int) $db->setQuery($db->getQuery(true)->select('id')->from('#__modules')
+          ->where('module = ' . $db->quote($spec['module']))->where('client_id = ' . (int) $spec['client'])
+          ->where("position = ''")->where('published = 0'), 0, 1)->loadResult();
+      if ($module->id) {
+          $db->updateObject('#__modules', $module, 'id');
+      } else {
+          unset($module->id);
+          $module->content = '';
+          $module->note    = '';
+          $db->insertObject('#__modules', $module, 'id');
+      }
+      // On all pages.
+      $db->setQuery($db->getQuery(true)->delete('#__modules_menu')->where('moduleid = ' . (int) $module->id))->execute();
+      $db->setQuery($db->getQuery(true)->insert('#__modules_menu')->columns('moduleid, menuid')->values((int) $module->id . ', 0'))->execute();
+      echo $module->id;
+    `);
+
+    if (response.text.trim() === 'missing') {
+      throw new Error(`No module "${module}" is installed`);
+    }
+  },
+
+  async addUserGroup({ title, parent = 'Registered' }, context) {
+    const parentId = (
+      await context.runPhp(`
+        ${joomlaPhp(context.root)}
+        echo (int) $db->setQuery($db->getQuery(true)->select('id')->from('#__usergroups')
+            ->where('title = ' . $db->quote(${phpString(parent)})), 0, 1)->loadResult();
+      `)
+    ).text.trim();
+
+    if (!Number(parentId)) {
+      throw new Error(`No user group "${parent}"`);
+    }
+
+    await saveForm(context, {
+      add: 'option=com_users&task=group.add',
+      edit: 'option=com_users&view=group&layout=edit',
+      save: 'option=com_users&layout=edit&id=0',
+      list: 'option=com_users&view=groups',
+      fields: { 'jform[title]': title, 'jform[parent_id]': parentId, task: 'group.save' },
+      what: `the user group "${title}"`,
+    });
+  },
+
+  async addArticle({ title, text, alias = '', category = 'uncategorised', language = '*', featured = false }, context) {
+    const catid = (
+      await context.runPhp(`
+        ${joomlaPhp(context.root)}
+        echo (int) $db->setQuery($db->getQuery(true)->select('id')->from('#__categories')
+            ->where("extension = 'com_content'")->where('alias = ' . $db->quote(${phpString(category)})), 0, 1)->loadResult();
+      `)
+    ).text.trim();
+
+    if (!Number(catid)) {
+      throw new Error(`No article category "${category}"`);
+    }
+
+    await saveForm(context, {
+      add: 'option=com_content&task=article.add',
+      edit: 'option=com_content&view=article&layout=edit',
+      save: 'option=com_content&layout=edit&id=0',
+      list: 'option=com_content&view=articles',
+      fields: {
+        'jform[title]': title,
+        'jform[alias]': alias,
+        'jform[articletext]': text,
+        'jform[catid]': catid,
+        'jform[state]': '1',
+        'jform[featured]': featured ? '1' : '0',
+        'jform[language]': language,
+        'jform[access]': '1',
+        task: 'article.save',
+      },
+      what: `the article "${title}"`,
+    });
   },
 
   async login(step, context) {
@@ -177,13 +316,17 @@ const STEPS = {
     `);
   },
 
-  async importSampleData({ type = 'blog' }, context) {
+  async importSampleData({ type = 'blog', group = 'sampledata', query = {} }, context) {
     const token = csrfToken(await context.request(`${context.siteUrl}/administrator/index.php`), 'the administrator');
+    const event = `${group.charAt(0).toUpperCase()}${group.slice(1)}ApplyStep`;
+    const extra = new URLSearchParams(query).toString();
 
     // Like the Sample Data module: step 1, 2, ... until the plugin has no further step.
-    for (let step = 1; step <= 20; step++) {
+    for (let step = 1; step <= 50; step++) {
+      context.progress(`Installing the ${type} data: step ${step}`);
+
       const response = await context.request(
-        `${context.siteUrl}/administrator/index.php?option=com_ajax&format=json&group=sampledata&${token}=1&type=${encodeURIComponent(type)}&plugin=SampledataApplyStep${step}&step=${step}`
+        `${context.siteUrl}/administrator/index.php?option=com_ajax&format=json&group=${encodeURIComponent(group)}&${token}=1&type=${encodeURIComponent(type)}&plugin=${event}${step}&step=${step}${extra ? `&${extra}` : ''}`
       );
       let result;
 
@@ -203,7 +346,7 @@ const STEPS = {
       const answers = (result.data ?? []).filter(Boolean);
 
       if (!result.success || (step === 1 && answers.length === 0)) {
-        throw new Error(result.message || `No sample data "${type}"`);
+        throw new Error(result.message ? `Step ${step} of the ${type} data: ${result.message}` : `No sample data "${type}"`);
       }
 
       if (answers.length === 0) {
@@ -213,7 +356,7 @@ const STEPS = {
       const failed = answers.find((answer) => !answer.success);
 
       if (failed) {
-        throw new Error(failed.message);
+        throw new Error(`Step ${step} of the ${type} data: ${failed.message}`);
       }
     }
   },
@@ -284,6 +427,31 @@ export async function download(url, { baseUrl, corsProxy = null, progress = () =
   }
 
   return new Uint8Array(await response.arrayBuffer());
+}
+
+/**
+ * Saves an item through its administrator form, like a user: open the new item's form, post it, read the messages
+ * on the list it returns to.
+ */
+async function saveForm(context, { add, edit, save, list, fields, what }) {
+  const page = (query) => `${context.siteUrl}/administrator/index.php?${query}`;
+
+  await context.request(page(add));
+
+  const token = csrfToken(await context.request(page(edit)), `the form of ${what}`);
+  const body = new URLSearchParams({ ...fields, [token]: '1' });
+
+  await context.request(page(save), {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new TextEncoder().encode(body.toString()),
+  });
+
+  const messages = joomlaMessages(await context.request(page(list)));
+
+  if (messages.error?.length || messages.danger?.length || !(messages.success?.length || messages.message?.length)) {
+    throw new Error([...(messages.error ?? []), ...(messages.danger ?? []), ...(messages.warning ?? [])].join(' ') || `Saving ${what} gave no result`);
+  }
 }
 
 function csrfToken(response, where) {
