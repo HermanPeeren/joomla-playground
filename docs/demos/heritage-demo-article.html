@@ -1,0 +1,46 @@
+<!--
+  "About this multilingual demo": an article for the heritage demo (web/public/blueprints/heritage-demo.json).
+  Taken out of the demo on 2026-10-23: in English only, it was not a good example on a site in five languages.
+  To use it again, add an addArticle step with this text (title "About this multilingual demo", language "*",
+  featured), preferably with a translation for each content language, linked as associations.
+-->
+<h1>About this multilingual demo</h1>
+
+<p>This site is a <strong>Joomla Playground</strong> running entirely in your browser. A blueprint set it up as a
+multilingual site in five languages: English, Dutch, German, French and Spanish. Its content, about UNESCO World
+Heritage sites, comes from the
+<a href="https://github.com/ceford/cefjdemos-plg-demodata">demonstration data plugin</a> and
+<a href="https://github.com/ceford/cefjdemos-mod-demodata">module</a> by Clifford E Ford.</p>
+
+<h2>What makes a Joomla site multilingual</h2>
+<ol>
+<li><strong>Language packs.</strong> Each language has a language pack, with the translations of Joomla's own texts
+for the site and the administrator (System &gt; Install &gt; Languages).</li>
+<li><strong>Content languages.</strong> A content language (Content &gt; Content Languages) tells Joomla which
+languages the content is in. It also gives each language its code in the URL, such as <code>/nl/</code>.</li>
+<li><strong>The Language Filter plugin.</strong> The System - Language Filter plugin reads the language from the
+URL. If the URL has none, it takes the language from the browser or the site default. It shows only the content
+in that language, or in <em>All</em> languages, like this article.</li>
+<li><strong>A Home page for every language.</strong> Each content language has its own menu with a Home menu item
+in that language. The default Home item is set to <em>All</em> languages.</li>
+<li><strong>Content per language.</strong> Articles, categories, menu items and modules each have a language.
+<em>Associations</em> link the translations of an item, so the language switcher can go to the same page in
+another language (Components &gt; Multilingual Associations).</li>
+<li><strong>The Language Switcher module.</strong> It shows the content languages, here as flags at the top of
+the page.</li>
+</ol>
+
+<h2>Try it</h2>
+<ul>
+<li>Switch languages with the flags, and see how the menus, the modules and the articles change.</li>
+<li>In the administrator, System &gt; Multilingual Status checks the setup.</li>
+<li>Content &gt; Articles can be filtered by language. The Multilingual Associations component shows the
+translations side by side.</li>
+</ul>
+
+<h2>How this site was made</h2>
+<p>A blueprint is a list of steps for a new playground. This one installs the language packs and publishes their
+content languages, enables the Language Filter, adds a Language Switcher, installs the demonstration data
+extensions, chooses the <em>heritage</em> dataset in five languages, installs it, and adds this article. The
+blueprint is <code>blueprints/heritage-demo.json</code> in the
+<a href="https://github.com/HermanPeeren/joomla-playground">Joomla Playground repository</a>.</p>

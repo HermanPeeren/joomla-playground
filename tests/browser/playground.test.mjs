@@ -499,7 +499,6 @@ describe('Blueprints', () => {
 
         found[code] = {
           lang: html.match(/<html[^>]* lang="([^"]+)"/)?.[1],
-          about: html.includes('About this multilingual demo'),
           switcher: html.includes('mod-languages'),
           items: (html.match(/class="blog-item/g) ?? []).length,
         };
@@ -510,7 +509,6 @@ describe('Blueprints', () => {
 
     for (const [code, lang] of Object.entries({ en: 'en-gb', nl: 'nl-nl', de: 'de-de', fr: 'fr-fr', es: 'es-es' })) {
       assert.equal(pages[code].lang, lang, `${code}: the page is in ${lang}`);
-      assert.ok(pages[code].about, `${code}: the explanation article is there`);
       assert.ok(pages[code].switcher, `${code}: the language switcher is there`);
       assert.ok(pages[code].items > 1, `${code}: the heritage articles are there (${pages[code].items})`);
     }
@@ -555,11 +553,29 @@ describe('Blueprints', () => {
       const page = await tab.evaluate(async (siteUrl) => {
         const html = await (await fetch(`${siteUrl}/index.php/fr/`)).text();
         const search = await (await fetch(`${siteUrl}/index.php/en/?option=com_finder&view=search&q=Frogs`)).text();
+        const administrator = await (await fetch(`${siteUrl}/administrator/index.php`)).text();
 
-        return { lang: html.match(/<html[^>]* lang="([^"]+)"/)?.[1], about: html.includes('About this multilingual demo'), search: search.includes('November: Frogs') };
+        return {
+          lang: html.match(/<html[^>]* lang="([^"]+)"/)?.[1],
+          items: (html.match(/class="blog-item/g) ?? []).length > 1,
+          search: search.includes('November: Frogs'),
+          // The administrator's menu (it disappeared when the Special view level got invalid rules).
+          adminMenu: (administrator.match(/class="item item-level-1/g) ?? []).length > 0,
+        };
       }, result.siteUrl);
 
-      assert.deepEqual(page, { lang: 'fr-fr', about: true, search: true });
+      assert.deepEqual(page, { lang: 'fr-fr', items: true, search: true, adminMenu: true });
+
+      // A media file of an installed extension, which the static bundle does not have: from the site's own files.
+      const script = await tab.evaluate(async (siteUrl) => {
+        const response = await fetch(`${siteUrl}/media/mod_demodata/js/demodata-process.js`);
+
+        return { status: response.status, type: response.headers.get('content-type'), demodata: (await response.text()).includes('demodataAjax') };
+      }, result.siteUrl);
+
+      assert.equal(script.status, 200);
+      assert.match(script.type, /javascript/);
+      assert.ok(script.demodata, "The module's own script");
     } finally {
       await tab.close();
       // The next build makes its own (npm run demos).

@@ -24,6 +24,12 @@
         "replace": "        $johndoe_id = $db->loadResult();\n\n        $query = $db->createQuery();\n        if (empty($is_installed)) {\n            // Add a record\n            $pp",
         "with": "        $johndoe_id = $db->loadResult();\n\n        // Not every dataset has this user.\n        if (!$johndoe_id) {\n            return;\n        }\n\n        $query = $db->createQuery();\n        if (empty($is_installed)) {\n            // Add a record\n            $pp",
         "why": "the heritage dataset has no user johndoe, so the privacy consent stored '' as a user id"
+      },
+      {
+        "file": "src/Extension/Features101.php",
+        "replace": "        $oddjob_id = $db->loadResult();\n",
+        "with": "        $oddjob_id = $db->loadResult();\n\n        // Not every dataset has this group.\n        if (!$oddjob_id) {\n            return;\n        }\n",
+        "why": "the heritage dataset has no group Oddjob: the Special view level got the rules [6,3,8,], invalid JSON, and the administrator menu disappeared"
       }
     ]
   }
