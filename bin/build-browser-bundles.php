@@ -15,7 +15,8 @@
  *                  (bin/download-language-packs.php), unless --no-languages
  *   versions.json  { "default": "6.2.0", "versions": [ <manifest of each bundle>, ... ] }
  *
- * A Full Package that is not in .cache/ yet is downloaded from the joomla/joomla-cms releases on GitHub.
+ * A Full Package that is not in .cache/ yet is downloaded from the joomla/joomla-cms releases on GitHub. At the end,
+ * the files of the playground's own blueprints are downloaded too (bin/download-blueprint-assets.php).
  */
 
 const PLAYGROUND_ROOT = __DIR__ . '/..';
@@ -91,6 +92,11 @@ foreach ($list['versions'] as $version) {
 }
 
 file_put_contents($out . '/versions.json', json_encode(['default' => $list['default'], 'versions' => $manifests], JSON_PRETTY_PRINT) . "\n");
+
+echo "== Files of the playground's blueprints\n";
+$process = proc_open([PHP_BINARY, __DIR__ . '/download-blueprint-assets.php'], [1 => STDOUT, 2 => STDERR], $pipes);
+proc_close($process) === 0 || fail('Downloading the files of the blueprints failed');
+
 echo "\nBundles: " . implode(', ', $list['versions']) . ' (default ' . $list['default'] . ")\n";
 
 function fail(string $message): never

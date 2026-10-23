@@ -9,6 +9,14 @@ After a few seconds you see Joomla's administrator, already logged in as a Super
 browser: PHP is compiled to WebAssembly, and the site and its database live in the tab's memory. Nothing is
 sent to a server.
 
+## Demos
+
+- **Multilingual site:** <https://hermanpeeren.github.io/joomla-playground/?blueprint=heritage-demo>. A site in
+  English, Dutch, German, French and Spanish, with content about UNESCO World Heritage sites from the
+  [demonstration data](https://github.com/ceford/cefjdemos-plg-demodata) of Clifford E Ford. An article on its
+  home page explains how a multilingual Joomla site works. Setting it up takes about 1.5 minutes: the blueprint
+  installs everything in your browser.
+
 ## Logging in
 
 The playground logs you in to the administrator by itself. If you log out, or want to log in on the front end:
@@ -75,6 +83,7 @@ A link can say how a new playground should look. Add these to the address:
 | `extension` | `?extension=https://example.org/mod_hello.zip` | Install an extension package (repeatable) |
 | `language` | `?language=nl-NL` | Install that language and make it the default of the site and the administrator |
 | `blueprint-url` | `?blueprint-url=https://example.org/blueprint.json` | Set up the site with a blueprint |
+| `blueprint` | `?blueprint=heritage-demo` | Set up the site with one of the playground's own blueprints |
 
 A **blueprint** is a small JSON file with the steps to set up a site. It can also be put in the address
 itself, after `#`. For example, this one installs Joomla's blog sample data, renames the site and opens the
@@ -96,8 +105,8 @@ The steps:
 | Step | Properties | What it does |
 |---|---|---|
 | `installExtension` | `url` | Install an extension package (zip) |
-| `enableExtension` | `element`, `type`, `folder`, `client` | Enable an extension, e.g. `{"element": "debug", "type": "plugin", "folder": "system"}` |
-| `importSampleData` | `type` (default `blog`) | Install Joomla's sample data |
+| `enableExtension` | `element`, `type`, `folder`, `client`, `params` | Enable an extension and set its options, e.g. `{"element": "debug", "type": "plugin", "folder": "system"}` |
+| `importSampleData` | `type` (default `blog`), `group`, `query` | Install Joomla's sample data, or data of a plugin that works like it |
 | `setGlobalConfig` | `values` | Set Global Configuration options (properties of `configuration.php`) |
 | `setSiteLanguage` | `language`, `administrator` | Make a language the default (its pack is installed if needed) |
 | `runSql` | `sql` | Run SQL statements (MySQL syntax; `#__` is the table prefix) |
@@ -105,6 +114,10 @@ The steps:
 | `writeFile` | `path`, `data` | Write a file into the site |
 | `unzip` | `url`, `to` | Unpack a zip into the site |
 | `login` | | Log in as the Super User (done by default) |
+| `installLanguage` | `language`, `publish` | Install a language and publish its content language |
+| `addModule` | `module`, `title`, `position`, `client`, `params`, `language` | Publish a module on all pages |
+| `addArticle` | `title`, `text`, `category`, `language`, `featured` | Add a published article |
+| `addUserGroup` | `title`, `parent` | Add a user group |
 
 Downloads (`extension`, `installExtension`, `unzip`) need a host that allows it (CORS headers), such as
 GitHub Pages or raw.githubusercontent.com; release downloads on GitHub do not. URLs in a blueprint are relative

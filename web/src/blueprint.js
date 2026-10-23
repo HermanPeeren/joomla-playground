@@ -2,6 +2,8 @@
 //
 //   #{"landingPage": "/administrator/index.php?option=com_content", "steps": [...]}   a blueprint in the fragment
 //   ?blueprint-url=https://example.org/blueprint.json                                 a blueprint to download
+//   ?blueprint=heritage-demo                                                           a blueprint of the playground
+//                                                                                     (web/public/blueprints/)
 //   ?php=8.3  ?url=/index.php  ?login=no  ?extension=<zip URL> (repeatable)  ?language=nl-NL
 //                                                                                     shortcuts, added on top
 //
@@ -20,6 +22,10 @@ export const DEFAULT_PHP_VERSION = '8.4';
 export const STEPS = {
   installExtension: ['url'],
   enableExtension: ['element'],
+  installLanguage: ['language'],
+  addModule: ['module', 'title', 'position'],
+  addArticle: ['title', 'text'],
+  addUserGroup: ['title'],
   login: [],
   setGlobalConfig: ['values'],
   runPHP: ['code'],
@@ -42,8 +48,14 @@ export async function blueprintFromUrl(url) {
 
   if (fragment.startsWith('{')) {
     blueprint = parseJson(fragment, 'the blueprint in the URL');
-  } else if (params.get('blueprint-url')) {
-    const source = new URL(params.get('blueprint-url'), url);
+  } else if (params.get('blueprint-url') || params.get('blueprint')) {
+    const name = params.get('blueprint');
+
+    if (name && !/^[a-z0-9-]+$/.test(name)) {
+      throw new Error(`Not a blueprint name: ${name}`);
+    }
+
+    const source = name ? new URL(`blueprints/${name}.json`, new URL('./', url)) : new URL(params.get('blueprint-url'), url);
     const response = await fetch(source);
 
     if (!response.ok) {

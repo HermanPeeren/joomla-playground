@@ -480,6 +480,43 @@ describe('Blueprints', () => {
     await tab.close();
   });
 
+  test('sets up the multilingual heritage demo (?blueprint=heritage-demo)', async () => {
+    const tab = await context.newPage();
+
+    await tab.goto(`${appUrl}?blueprint=heritage-demo`);
+
+    const result = await waitForPlayground(tab);
+
+    console.log('heritage demo timings (ms):', JSON.stringify(result.timings));
+    assert.equal(result.blueprintError, null);
+
+    const pages = await tab.evaluate(async (siteUrl) => {
+      const found = {};
+
+      for (const code of ['en', 'nl', 'de', 'fr', 'es']) {
+        const html = await (await fetch(`${siteUrl}/index.php/${code}/`)).text();
+
+        found[code] = {
+          lang: html.match(/<html[^>]* lang="([^"]+)"/)?.[1],
+          about: html.includes('About this multilingual demo'),
+          switcher: html.includes('mod-languages'),
+          items: (html.match(/class="blog-item/g) ?? []).length,
+        };
+      }
+
+      return found;
+    }, result.siteUrl);
+
+    for (const [code, lang] of Object.entries({ en: 'en-gb', nl: 'nl-nl', de: 'de-de', fr: 'fr-fr', es: 'es-es' })) {
+      assert.equal(pages[code].lang, lang, `${code}: the page is in ${lang}`);
+      assert.ok(pages[code].about, `${code}: the explanation article is there`);
+      assert.ok(pages[code].switcher, `${code}: the language switcher is there`);
+      assert.ok(pages[code].items > 1, `${code}: the heritage articles are there (${pages[code].items})`);
+    }
+
+    await tab.close();
+  });
+
   test('reports a wrong blueprint', async () => {
     const tab = await context.newPage();
 

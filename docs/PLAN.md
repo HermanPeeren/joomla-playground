@@ -193,6 +193,16 @@ pitch to the Joomla production department.
   - **Done (2026-10-22)** (REPORT §17): PHP version picker, Start over; Export and Site/Administrator were
     already there. The Joomla version picker came with part 6.
 
+## Demos
+
+- **Multilingual demo** (`?blueprint=heritage-demo`, REPORT §24). **Done (2026-10-23)** as a blueprint; it takes
+  about 90 s to set up.
+- **Next: a prebuilt export.** CI runs the blueprint in headless Chrome, exports the site, and publishes the
+  zip; `?demo=heritage` (or the blueprint itself) then starts from it in seconds. Rebuild it when its sources
+  change: the Joomla versions (daily workflow), the demo data repositories (a scheduled check of their latest
+  commit), or the blueprint. This needs starting a playground from a zip at a URL.
+- Report the problems found in the demonstration data plugin upstream (REPORT §24).
+
 ## Phase 3: ecosystem
 
 - **CLI:** `npx joomla-playground` with `@php-wasm/node`, mounting an extension folder for development.

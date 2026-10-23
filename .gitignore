@@ -10,3 +10,4 @@ cypress.env.json
 /docs/*.pdf
 /web/public/joomla/
 /web/dist/
+/web/public/blueprints/assets/

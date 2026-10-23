@@ -889,7 +889,55 @@ System > Install Languages now installs language packs, without a CORS proxy.
 - **Tests:** Install Languages installs Dutch (on the first page of the list); `?language=nl-NL` opens a Dutch
   administrator.
 
-## 24. Sources
+## 24. A multilingual demo from a blueprint (2026-10-23)
+
+<https://hermanpeeren.github.io/joomla-playground/?blueprint=heritage-demo> sets up a multilingual site with
+Clifford E Ford's [demonstration data plugin](https://github.com/ceford/cefjdemos-plg-demodata) and
+[module](https://github.com/ceford/cefjdemos-mod-demodata): the *heritage* dataset (UNESCO World Heritage sites)
+in English, Dutch, German, French and Spanish. It follows the setup of the plugin's README.
+
+**The blueprint** (`web/public/blueprints/heritage-demo.json`):
+1. `installLanguage` nl-NL, de-DE, fr-FR, es-ES: the packs on board (§23), and their content languages published.
+2. `enableExtension` System - Language Filter.
+3. `addModule` Language Switcher (flags, position `topbar`).
+4. `installExtension` the module, and `addModule` it on the Home Dashboard (position `cpanel`).
+5. `installExtension` the plugin; `enableExtension` with its options: dataset `heritage`, the five languages.
+6. `addUserGroup` "Magazine Reviewers" (see below).
+7. `importSampleData` with `group: "demodata"`: the 16 steps the module's Install button runs.
+8. `addArticle` "About this multilingual demo": what makes a Joomla site multilingual, how to try it, and how this
+   site was made. Featured, for all languages.
+
+**New in the playground for it:**
+- `?blueprint=<name>`: the playground's own blueprints, in `web/public/blueprints/`.
+- Steps `installLanguage`, `addModule`, `addArticle` and `addUserGroup`; `enableExtension` sets `params`;
+  `importSampleData` takes another plugin `group` and extra `query` parameters.
+- `addArticle` and `addUserGroup` save through Joomla's administrator forms, as a user would, so Joomla's own
+  checks and events apply.
+- **Copies of the extensions:** GitHub's archive downloads send no CORS headers. `npm run bundle` downloads the
+  repositories (`web/public/blueprints/assets.json`) and repacks their extension folder as an installable zip,
+  served next to the playground.
+
+**Found in the demonstration data plugin** (version 0.3.1). None of these come from the playground; they would
+fail on a Linux server or with MySQL's strict mode as well. Until they are fixed upstream, the playground's copy
+is patched (`patches` in `assets.json`), or the blueprint works around them:
+
+| Problem | Effect | In the playground |
+|---|---|---|
+| The heritage users include one in the group "Magazine Reviewers", which the dataset does not create | Step 3 (users) fails: "cannot save account without groups" | The blueprint adds the group first |
+| `createModel('NewsFeed', …)`: the class is `NewsfeedModel` | On a case-sensitive file system (Linux) no model is found: step 11 (newsfeeds) fails | Patched |
+| The completion step sends a private message from user "superman" to "playwright"; the heritage dataset has neither | Invalid SQL (`user_id_from = ,`): step 16 fails | Patched: skipped without those users |
+| It stores a privacy consent for user "johndoe", who is not in the heritage dataset | `''` as a user id: rejected by MySQL's strict mode and by SQLite | Patched: skipped without that user |
+| The workflow transitions refer to a stage "Published"; the stage is called "Article published!" | PHP warnings, transitions without a stage | Not fixed; the demo does not use the workflows |
+| No language string `PLG_DEMODATA_USER_STEP_FAILED` | Error messages show the key only | Not fixed |
+
+**Measured:** ready in about 90 s (headless Chrome, local server): 2.7 s for the playground, then the blueprint.
+Most of it is the demonstration data's 16 steps. A prebuilt export would start in a few seconds; that is the
+next step (see the plan).
+
+**Tests:** the browser suite (19 tests) runs the whole demo and checks the home page of each of the five
+languages: its language, the explanation article, the language switcher and the heritage articles.
+
+## 25. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)

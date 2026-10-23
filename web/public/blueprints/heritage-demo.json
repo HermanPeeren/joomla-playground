@@ -1,0 +1,95 @@
+{
+  "meta": {
+    "title": "Multilingual demo: UNESCO World Heritage",
+    "description": "A Joomla site in English, Dutch, German, French and Spanish, with the heritage dataset of Clifford E Ford's demonstration data plugin.",
+    "author": "Joomla Playground"
+  },
+  "preferredVersions": {
+    "joomla": "6.2"
+  },
+  "landingPage": "/index.php",
+  "steps": [
+    {
+      "step": "installLanguage",
+      "language": "nl-NL"
+    },
+    {
+      "step": "installLanguage",
+      "language": "de-DE"
+    },
+    {
+      "step": "installLanguage",
+      "language": "fr-FR"
+    },
+    {
+      "step": "installLanguage",
+      "language": "es-ES"
+    },
+    {
+      "step": "enableExtension",
+      "element": "languagefilter",
+      "type": "plugin",
+      "folder": "system"
+    },
+    {
+      "step": "addModule",
+      "module": "mod_languages",
+      "title": "Languages",
+      "position": "topbar",
+      "showtitle": false,
+      "params": {
+        "dropdown": "0",
+        "image": "1",
+        "inline": "1",
+        "full_name": "0",
+        "show_active": "1"
+      }
+    },
+    {
+      "step": "installExtension",
+      "url": "assets/cefjdemos/mod_demodata.zip"
+    },
+    {
+      "step": "addModule",
+      "module": "mod_demodata",
+      "title": "Demonstration Data",
+      "position": "cpanel",
+      "client": "administrator"
+    },
+    {
+      "step": "installExtension",
+      "url": "assets/cefjdemos/plg_demodata_features101.zip"
+    },
+    {
+      "step": "enableExtension",
+      "element": "features101",
+      "type": "plugin",
+      "folder": "demodata",
+      "params": {
+        "dataset": "heritage",
+        "languages": "en-GB,nl-NL,de-DE,fr-FR,es-ES"
+      }
+    },
+    {
+      "step": "addUserGroup",
+      "title": "Magazine Reviewers",
+      "parent": "Registered"
+    },
+    {
+      "step": "importSampleData",
+      "group": "demodata",
+      "type": "features101",
+      "query": {
+        "action": "install"
+      }
+    },
+    {
+      "step": "addArticle",
+      "title": "About this multilingual demo",
+      "alias": "about-this-multilingual-demo",
+      "text": "<p>This site is a <strong>Joomla Playground</strong> running entirely in your browser. A blueprint set it up as a\nmultilingual site in five languages: English, Dutch, German, French and Spanish. Its content, about UNESCO World\nHeritage sites, comes from the\n<a href=\"https://github.com/ceford/cefjdemos-plg-demodata\">demonstration data plugin</a> and\n<a href=\"https://github.com/ceford/cefjdemos-mod-demodata\">module</a> by Clifford E Ford.</p>\n\n<h2>What makes a Joomla site multilingual</h2>\n<ol>\n<li><strong>Language packs.</strong> Each language has a language pack, with the translations of Joomla's own texts\nfor the site and the administrator (System &gt; Install &gt; Languages).</li>\n<li><strong>Content languages.</strong> A content language (Content &gt; Content Languages) tells Joomla which\nlanguages the content is in. It also gives each language its code in the URL, such as <code>/nl/</code>.</li>\n<li><strong>The Language Filter plugin.</strong> The System - Language Filter plugin reads the language from the\nURL. If the URL has none, it takes the language from the browser or the site default. It shows only the content\nin that language, or in <em>All</em> languages, like this article.</li>\n<li><strong>A Home page for every language.</strong> Each content language has its own menu with a Home menu item\nin that language. The default Home item is set to <em>All</em> languages.</li>\n<li><strong>Content per language.</strong> Articles, categories, menu items and modules each have a language.\n<em>Associations</em> link the translations of an item, so the language switcher can go to the same page in\nanother language (Components &gt; Multilingual Associations).</li>\n<li><strong>The Language Switcher module.</strong> It shows the content languages, here as flags at the top of\nthe page.</li>\n</ol>\n\n<h2>Try it</h2>\n<ul>\n<li>Switch languages with the flags, and see how the menus, the modules and the articles change.</li>\n<li>In the administrator, System &gt; Multilingual Status checks the setup.</li>\n<li>Content &gt; Articles can be filtered by language. The Multilingual Associations component shows the\ntranslations side by side.</li>\n</ul>\n\n<h2>How this site was made</h2>\n<p>A blueprint is a list of steps for a new playground. This one installs the language packs and publishes their\ncontent languages, enables the Language Filter, adds a Language Switcher, installs the demonstration data\nextensions, chooses the <em>heritage</em> dataset in five languages, installs it, and adds this article. The\nblueprint is <code>blueprints/heritage-demo.json</code> in the\n<a href=\"https://github.com/HermanPeeren/joomla-playground\">Joomla Playground repository</a>.</p>",
+      "language": "*",
+      "featured": true
+    }
+  ]
+}
