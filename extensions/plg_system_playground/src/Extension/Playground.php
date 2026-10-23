@@ -8,6 +8,7 @@
 namespace JoomlaPlayground\Plugin\System\Playground\Extension;
 
 use Joomla\CMS\Event\Model\PrepareFormEvent;
+use Joomla\CMS\Language\Text;
 use Joomla\CMS\Plugin\CMSPlugin;
 use Joomla\Database\DatabaseAwareTrait;
 use Joomla\Event\SubscriberInterface;
@@ -31,8 +32,28 @@ final class Playground extends CMSPlugin implements SubscriberInterface
     public static function getSubscribedEvents(): array
     {
         return [
+            'onAfterRoute'         => 'onAfterRoute',
             'onContentPrepareForm' => 'onContentPrepareForm',
         ];
+    }
+
+    /**
+     * In the browser, PHP's HTTP requests go through fetch(), so a server must allow cross-origin requests. The list
+     * of languages (update.joomla.org) does; the language packs (downloads.joomla.org) do not. Say so on the page,
+     * next to Joomla's own "Error connecting to the server" after an attempt.
+     *
+     * The PHP worker of the browser playground sets $_SERVER['JOOMLA_PLAYGROUND'] (see web/src/php-worker.js).
+     */
+    public function onAfterRoute(): void
+    {
+        $app = $this->getApplication();
+
+        if (($_SERVER['JOOMLA_PLAYGROUND'] ?? '') !== 'browser' || !$app->isClient('administrator')
+            || $app->getInput()->getCmd('option') !== 'com_installer' || $app->getInput()->getCmd('view') !== 'languages') {
+            return;
+        }
+
+        $app->enqueueMessage(Text::_('PLG_SYSTEM_PLAYGROUND_NO_LANGUAGE_DOWNLOADS'), 'warning');
     }
 
     /**

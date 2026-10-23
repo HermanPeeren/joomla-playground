@@ -739,7 +739,55 @@ Worker that fetches such a file and returns it with CORS headers, like WordPress
   `SqliteDriver` and the MySQL emulation already did.
 - **Tests** (14): switch from PHP 8.4 to 8.5, check that Joomla's front end answers without errors, start over.
 
-## 18. Sources
+## 18. Fix: pages that hung the playground, and the sample data error (2026-10-22)
+
+Reported: in the administrator, the System pages made the playground hang (e.g. adding a language), and
+installing the Blog Sample Data said "There is an error in a sample data plugin. Response is invalid."
+
+**Findings**
+- **System dashboard:** not the cause. It loads in about 1.4 s.
+- **System > Install Languages** hung. Joomla reads the list of languages from update.joomla.org.
+  - Without networking, `@php-wasm/web` gives PHP a WebSocket whose `send()` does nothing.
+  - curl has no timeout set (Joomla gives none), so it waited its default connect timeout of 300 s.
+  - All other requests waited behind it in the worker's queue. The service worker gave up on them after 120 s
+    (HTTP 503).
+  - A per-request timeout in the queue would not help: a running PHP request cannot be stopped, and the single
+    PHP instance can do nothing else meanwhile.
+- **Installing a language** then looked stuck too. The cause was something else: a redirect out of the playground.
+  - `@php-wasm` sets `SCRIPT_NAME` without the path of the site URL (`/administrator/index.php` instead of
+    `/scope-…/administrator/index.php`). `REQUEST_URI` and `PHP_SELF` do have it.
+  - The Joomla Framework derives its base URL from `SCRIPT_NAME`. So a redirect to a relative `index.php?…`
+    (after installing a language or an extension) went to the web server outside the scope, which answered 404.
+- **Blog Sample Data:** the warning in the JSON of step 1 (SHOW VARIABLES), already fixed in §14. A browser
+  test now installs it from the home dashboard, as a user does.
+
+**Fixes**
+
+| Problem | Fix |
+|---|---|
+| PHP's HTTP requests never answered | The worker loads PHP with `tcpOverFetch`: `@php-wasm` ends PHP's TLS connection with a certificate from a CA generated in the worker (trusted through `openssl.cafile` and `curl.cainfo`), then sends the request with `fetch()` |
+| `SCRIPT_NAME` without the scope | An `auto_prepend_file` puts the site path in front of `SCRIPT_NAME` (and sets `PATH_INFO`) |
+
+**What networking over fetch() can and cannot do.** The browser's CORS rules apply: a server must allow
+requests from another website.
+- update.joomla.org sends `Access-Control-Allow-Origin: *`. The language list, update lists and language details
+  load: Install Languages takes about 2 s.
+- downloads.joomla.org (and the S3 bucket it redirects to) does not. A language pack download fails at once with
+  Joomla's "Error connecting to the server: 400".
+  - The playground's system plugin adds a notice on Install Languages that says so. It suggests uploading the zip
+    instead.
+  - Installing language packs from the list needs a CORS proxy. `tcpOverFetch` takes a `corsProxyUrl`, but it
+    appends the raw URL to it and expects an `X-Playground-Cors-Proxy` response header; the proxy of §16 takes
+    `?url=<encoded URL>`. Connecting the two is not done yet.
+- The update quickicons, the update notification task and the web installer stay disabled in the bundle, as
+  before. Whether they work over fetch() is untested.
+
+**Tests:** the browser suite adds:
+- the System dashboard and Install Languages, a language install that fails quickly and stays in the scope, then
+  a request that is answered;
+- the Blog Sample Data, with valid JSON from every step.
+
+## 19. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)
