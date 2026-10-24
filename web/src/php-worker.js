@@ -90,11 +90,12 @@ function progress(message) {
  * @param {string} [options.site] Slug of a saved site to open, or to create from the bundle
  * @param {string} [options.title] Title for a new saved site
  * @param {ArrayBuffer} [options.zip] An exported playground to start from
+ * @param {string} [options.zipUrl] An exported playground to download and start from (a prebuilt demo)
  * @param {string} [options.php] PHP version; default: the saved site's, or DEFAULT_PHP_VERSION
  * @param {object} [options.blueprint] How to set up a new playground (see blueprint.js)
  * @param {string} [options.corsProxy] URL of a CORS proxy (proxy/cors-proxy.js) for downloads
  */
-async function boot({ base, scope, joomla, site = null, title = null, zip = null, php: phpVersion = null, blueprint = null, corsProxy = null }) {
+async function boot({ base, scope, joomla, site = null, title = null, zip = null, zipUrl = null, php: phpVersion = null, blueprint = null, corsProxy = null }) {
   const started = performance.now();
   const timings = {};
   const lap = (name) => (timings[name] = Math.round(performance.now() - started));
@@ -116,7 +117,7 @@ async function boot({ base, scope, joomla, site = null, title = null, zip = null
     // Outgoing HTTP(S) from PHP goes through the browser's fetch() (see enableNetwork()).
     loadWebRuntime(phpVersion, { tcpOverFetch: { CAroot: caRoot, ...(corsProxy ? { corsProxyUrl: corsProxy } : {}) } }).then((runtime) => (lap('php'), new PHP(runtime))),
     fetch(new URL(`joomla/${joomla}/manifest.json`, base)).then((response) => response.json()),
-    siteFiles({ bundle: new URL(`joomla/${joomla}/`, base), site, meta, zip }).then((files) => (lap(meta ? 'read' : 'download'), files)),
+    siteFiles({ bundle: new URL(`joomla/${joomla}/`, base), site, meta, zip, zipUrl }).then((files) => (lap(meta ? 'read' : 'download'), files)),
   ]);
 
   const password = meta?.password ?? randomPassword();
@@ -317,7 +318,11 @@ async function boot({ base, scope, joomla, site = null, title = null, zip = null
 /**
  * The zip to start from (the bundle, an imported export, or a saved site's base), and a saved site's snapshot.
  */
-async function siteFiles({ bundle, site, meta, zip }) {
+async function siteFiles({ bundle, site, meta, zip, zipUrl }) {
+  if (zipUrl) {
+    return { bytes: await download(new URL(zipUrl), 'the prebuilt demo'), snapshot: null };
+  }
+
   if (!meta) {
     return { bytes: zip ? new Uint8Array(zip) : await download(new URL('site.zip', bundle)), snapshot: null };
   }
@@ -749,8 +754,8 @@ async function sha256(bytes) {
   return Array.from(hash, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function download(url) {
-  progress('Downloading Joomla');
+async function download(url, what = 'Joomla') {
+  progress(`Downloading ${what}`);
 
   const response = await fetch(url);
 
@@ -774,7 +779,7 @@ async function download(url) {
     received += value.length;
 
     if (total) {
-      progress(`Downloading Joomla: ${Math.round((received / total) * 100)}% of ${(total / 1048576).toFixed(1)} MB`);
+      progress(`Downloading ${what}: ${Math.round((received / total) * 100)}% of ${(total / 1048576).toFixed(1)} MB`);
     }
   }
 

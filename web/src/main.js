@@ -43,6 +43,12 @@ const elements = {
 
 let worker = null;
 let playground = null;
+
+/**
+ * The service worker serves the Joomla frame. It starts while PHP and the site are downloaded; only the frame waits
+ * for it (show()).
+ */
+let serviceWorkerReady = null;
 let readyStatus = '';
 let backgroundStatus = null;
 
@@ -168,9 +174,13 @@ function show(path = '/administrator/') {
   elements.php.value = playground.phpVersion;
   elements.joomla.value = playground.manifest.joomla;
   elements.info.title = Object.entries(playground.timings).map(([step, ms]) => `${step}: ${ms} ms`).join('\n');
-  elements.frame.addEventListener('load', () => setLoading(false), { once: true });
-  elements.frame.src = `${playground.siteUrl}${path}`;
   setBusy(false);
+  serviceWorkerReady
+    .then(() => {
+      elements.frame.addEventListener('load', () => setLoading(false), { once: true });
+      elements.frame.src = `${playground.siteUrl}${path}`;
+    })
+    .catch((error) => setStatus(`The service worker did not start: ${error.message}`, true));
 
   // For tests and debugging.
   window.joomlaPlayground = playground;
@@ -448,7 +458,7 @@ async function newestServiceWorker(registration) {
  * The prebuilt export of one of the playground's own blueprints (web/dist/demos/, see scripts/build-demos.mjs), when
  * it was made from this version of the blueprint. Not with ?fresh, nor when the URL changes the blueprint.
  *
- * @returns {Promise<{bytes: ArrayBuffer, joomla: string}|null>}
+ * @returns {Promise<{url: string, joomla: string}|null>}
  */
 async function prebuiltDemo(blueprint, url) {
   const name = blueprint?.source?.name;
@@ -466,17 +476,9 @@ async function prebuiltDemo(blueprint, url) {
       return null;
     }
 
-    setStatus('Downloading the prebuilt demo');
-
-    const zip = await fetch(new URL(`demos/${name}.zip`, base));
-
-    if (!zip.ok) {
-      return null;
-    }
-
     const joomla = bundles.versions.some((bundle) => bundle.joomla === demo.joomla) ? demo.joomla : bundles.default;
 
-    return { bytes: await zip.arrayBuffer(), joomla };
+    return { url: new URL(`demos/${name}.zip`, base).href, joomla };
   } catch {
     // No prebuilt demo (e.g. vite's fallback page instead of JSON): run the blueprint.
     return null;
@@ -494,8 +496,9 @@ async function start() {
     throw new Error('This browser does not support service workers (they need HTTPS or localhost).');
   }
 
-  setStatus('Starting the service worker');
-  await newestServiceWorker(await navigator.serviceWorker.register(new URL('sw.js', base), { scope: base.pathname }));
+  // Not awaited: PHP and the site download meanwhile, and the frame waits for it (see show()).
+  setStatus('Starting');
+  serviceWorkerReady = navigator.serviceWorker.register(new URL('sw.js', base), { scope: base.pathname }).then(newestServiceWorker);
 
   bundles = await (await fetch(new URL('joomla/versions.json', base))).json();
   elements.joomla.replaceChildren(...bundles.versions.map((bundle) => new Option(bundle.joomla, bundle.joomla)));
@@ -530,10 +533,13 @@ async function start() {
 
   if (prebuilt) {
     // The site the blueprint makes, exported at build time: start from it, like an import, without the steps.
-    await boot(
-      { zip: prebuilt.bytes, joomla: prebuilt.joomla, php: blueprint.preferredVersions?.php ?? null, blueprint: { landingPage: blueprint.landingPage, login: blueprint.login, steps: [] } },
-      [prebuilt.bytes]
-    );
+    // The PHP worker downloads the zip while it loads PHP.
+    await boot({
+      zipUrl: prebuilt.url,
+      joomla: prebuilt.joomla,
+      php: blueprint.preferredVersions?.php ?? null,
+      blueprint: { landingPage: blueprint.landingPage, login: blueprint.login, steps: [] },
+    });
     playground.prebuilt = blueprint.source.name;
     show(playground.landingPage ?? '/administrator/');
 
