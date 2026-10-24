@@ -1108,6 +1108,9 @@ Patch Tester or to a blueprint.
   - In the blueprint test, a curl request to update.joomla.org with Joomla's CA bundle must give HTTP 200.
   - The Patch Tester itself is not in the test: GitHub allows 60 requests an hour without a token, and CI shares
     its addresses.
+- **A blueprint:** `?blueprint=patchtester` installs the Patch Tester and opens its list. The release zip is
+  mirrored on the playground's site (`assets.json`), because GitHub's release downloads send no CORS headers.
+  Applying a patch works too: Apply Patch on a pull request took about 2 s, in the browser, without a CORS proxy.
 - **Without a token**, GitHub allows 60 API requests an hour per IP address. One fetch of joomla-cms uses four.
   A blueprint must never contain a token: anyone with the link could read it.
 

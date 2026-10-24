@@ -609,6 +609,26 @@ describe('Blueprints', () => {
     }
   });
 
+  test('installs the Patch Tester (?blueprint=patchtester)', async () => {
+    const tab = await context.newPage();
+
+    try {
+      await tab.goto(`${appUrl}?blueprint=patchtester`);
+
+      const result = await waitForPlayground(tab);
+
+      assert.equal(result.blueprintError, null);
+
+      // Fetch Data needs GitHub (60 requests an hour without a token), so the test stops at the list.
+      const frame = await (await tab.waitForSelector('#joomla')).contentFrame();
+
+      await frame.waitForSelector('text=Fetch Data', { timeout: 60000 });
+      assert.match(frame.url(), /option=com_patchtester&view=pulls/);
+    } finally {
+      await tab.close();
+    }
+  });
+
   test('reports a wrong blueprint', async () => {
     const tab = await context.newPage();
 

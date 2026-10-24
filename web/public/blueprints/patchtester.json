@@ -1,0 +1,17 @@
+{
+  "meta": {
+    "title": "Patch Tester",
+    "description": "Joomla with the Patch Tester (joomla-extensions/patchtester) installed: fetch the open pull requests of joomla-cms from GitHub and test them.",
+    "author": "Joomla Playground"
+  },
+  "preferredVersions": {
+    "joomla": "6.2"
+  },
+  "landingPage": "/administrator/index.php?option=com_patchtester&view=pulls",
+  "steps": [
+    {
+      "step": "installExtension",
+      "url": "assets/patchtester/com_patchtester.zip"
+    }
+  ]
+}
