@@ -40,16 +40,16 @@ already been done by the WordPress Playground team and can be reused.
   the full test suite passes there. WebAssembly costs 5–8× natively; the MySQL emulation adds 1.2–1.5× on top.
   See §11.
 - **Update, 2026-10-22: step 3 is done (first version).** Joomla runs in a browser tab: no server-side PHP, and
-  it is ready about 2 s after the page loads (locally). The administrator is logged in automatically. The site,
+  it is ready about 2s after the page loads (locally). The administrator is logged in automatically. The site,
   the administrator, forms, AJAX and static media work, and Chrome browser tests cover them. See §12.
-- **Public playground:** <https://hermanpeeren.github.io/joomla-playground/> (GitHub Pages). It is ready about 6 s after the page loads, downloads included.
+- **Public playground:** <https://hermanpeeren.github.io/joomla-playground/> (GitHub Pages). It is ready about 6s after the page loads, downloads included.
 - **Update, 2026-10-22: phase 2, part 2.** A link sets up a new playground: PHP version (8.3, 8.4, 8.5),
   landing page, login, extensions to install, or a whole blueprint with steps such as sample data, global
   configuration and SQL. See §14.
 - **Update, 2026-10-22: phase 2, part 1.** Playgrounds can be saved in the browser (OPFS), reopened after a
   reload, listed under "My sites", exported as a zip and imported again. A saved site is stored as its starting
-  zip plus a snapshot of its changes: saving takes 0.3 s instead of 13 s, and reopening takes 1–2 s more than a
-  new playground instead of 5 s more. See §13.
+  zip plus a snapshot of its changes: saving takes 0.3s instead of 13s, and reopening takes 1–2s more than a
+  new playground instead of 5s more. See §13.
 
 ## 2. How WordPress Playground works, and what is reusable
 
@@ -92,12 +92,12 @@ bundle stays GPL.
 **Things WordPress had to work around, which Joomla will hit as well:**
 - `set_time_limit()` isn't supported.
 - `gethostbyname` returns private IPs.
-- Networking during install made it take 60–300 s, so networking is switched off then.
+- Networking during install made it take 60–300s, so networking is switched off then.
 - `target="_top"` links and popups escape the iframe.
 - Mail is captured in an in-app inbox, not sent.
 - `exec`/`proc_open` are sandboxed.
 - Memory is limited (64 MB initial, growable).
-- Boot takes 5–10 s for a fresh site.
+- Boot takes 5–10s for a fresh site.
 
 **Effort reference:** Playground started as a PoC by Adam Zieliński (Automattic) in 2022 and has grown to
 ~4,900 commits and ~160 contributors. Most of that effort went into the runtime (browser I/O, networking,
@@ -206,11 +206,11 @@ natively first, then move it into php-wasm.
 | **Scope URLs** | `REQUEST_URI`, `SCRIPT_NAME` and `SCRIPT_FILENAME` must agree under `/scope:xyz/`. `SiteRouter.php:151` compares `realpath(SCRIPT_FILENAME)` with `JPATH_PUBLIC`. Set `live_site` and `cookie_path`. TYPO3 had the same issue. |
 | **Iframe** | Joomla links with `target="_top"`, `window.top` references in admin JS, and TinyMCE iframes may escape the service worker. Needs testing (WordPress needed a TinyMCE fix). |
 | **Outbound network** | CORS blocks the update server, JED/web installer (`appscdn.joomla.org`), install-from-URL and language packs. Use php-wasm's tcp-over-fetch + a **CORS proxy** (Cloudflare Worker or the reusable PHP proxy), or disable these. |
-| **Single-threaded requests** | The lazy scheduler (on by default, 300 s) and the `update.notification` task can block the UI for up to 20 s. Disable them in the snapshot. |
+| **Single-threaded requests** | The lazy scheduler (on by default, 300s) and the `update.notification` task can block the UI for up to 20s. Disable them in the snapshot. |
 | **Mail** | Set `mailonline=0`, or capture `mail()` into an in-app inbox as WordPress does. |
 | **Not usable in the browser** | `com_joomlaupdate` (self-update), public-folder symlinks, the stats plugin. Disable or hide them in the snapshot. |
 | **32-bit WASM integers** | ~~`PHP_INT_SIZE` is 4 on wasm32.~~ Not an issue: step 2 measured `PHP_INT_SIZE` = 8 in `@php-wasm` 3.1.60 (§11). |
-| **Performance** | Expect 5–15 s boot and a sluggish admin on mobile. Fine for demos, trials and PR previews, not for daily development (Automattic's Studio moved to native PHP for that reason). |
+| **Performance** | Expect 5–15s boot and a sluggish admin on mobile. Fine for demos, trials and PR previews, not for daily development (Automattic's Studio moved to native PHP for that reason). |
 | **Persistence** | Browser storage can be evicted. Offer export/import (zip) early. |
 | **Extensions with MySQL-only SQL** | Under Option A they install without tables. Mitigate with a system plugin that translates MySQL install SQL on install, or by choosing Option C. |
 | **Browser support** | JSPI ships in Chrome/Edge 137+, Firefox ~153+ and Safari 27. Keep the Asyncify builds as a fallback (`@php-wasm/web` picks one automatically). |
@@ -385,7 +385,7 @@ The second database strategy (Option C) also works. Joomla 6.2.0 runs on WordPre
 
 | | playgroundsqlite (A) | mysqlonsqlite (C) |
 |---|---|---|
-| Install from the Full Package | 6.1 s | 6.7 s |
+| Install from the Full Package | 6.1s | 6.7s |
 | Database size after install | 1.6 MB | 2.0 MB |
 | Site home / category page | 48 / 52 ms | 64 / 136 ms |
 | Admin dashboard / articles / menu items | 79 / 58 / 67 ms | 129 / 107 / 148 ms |
@@ -461,7 +461,7 @@ tests included. CI runs WebAssembly jobs next to the native ones.
 | Admin extensions | 388 ms | 504 ms | 521 ms | 627 ms |
 
 - WebAssembly itself costs 5–8× (Asyncify build, files read from the host through NODEFS). The first request
-  takes about 2 s (warm-up).
+  takes about 2s (warm-up).
 - **In WebAssembly the MySQL emulation adds only 1.2–1.5×**, against up to 2.6× natively. PHP execution
   dominates, so the emulator's share shrinks.
 - OPcache is switched on in the ini, but `opcache_get_status()` does not report it as active. If every request
@@ -529,10 +529,10 @@ A static web server is enough: there is no PHP on the server.
 
 | PHP loaded | site.zip downloaded | unpacked | configured | logged in (ready) |
 |---|---|---|---|---|
-| 0.2 s | 0.3 s | 1.1 s | 1.4 s | 2.0 s |
+| 0.2s | 0.3s | 1.1s | 1.4s | 2.0s |
 
 - **Pages:** like `@php-wasm/node` in step 2, a few hundred ms per page. Creating an article through the
-  administrator form takes about 3 s in the browser test, including loading the form and the article list.
+  administrator form takes about 3s in the browser test, including loading the form and the article list.
 
 **What had to be solved**
 
@@ -541,7 +541,7 @@ A static web server is enough: there is no PHP on the server.
 | A single PHP instance rejects a request that arrives while another one runs (`SinglePHPInstanceManager`), so the dashboard's simultaneous AJAX calls got HTTP 500 | Queue the requests in the worker (and in the Node runner), as `php -S` does |
 | Chrome rejects a constructed 3xx `Response` for a page navigation (`ERR_ABORTED`) | The service worker answers redirects with `Response.redirect()` |
 | `administrator/cache/autoload_psr4.php` (Joomla's namespace map) holds absolute build paths: "class does not exist" | The build empties Joomla's caches; Joomla rebuilds them in the browser |
-| Without network, the "Automated Update" dashboard widget blocks PHP for 20 s per call, and the queued requests behind it | `plg_quickicon_autoupdate` is disabled in the bundle, like the other update checks |
+| Without network, the "Automated Update" dashboard widget blocks PHP for 20s per call, and the queued requests behind it | `plg_quickicon_autoupdate` is disabled in the bundle, like the other update checks |
 | Joomla only links media files that exist | Empty placeholders in `site.zip`; the service worker serves the real files |
 | Cookies cannot be set by a service worker response | The worker's cookie store (`HttpCookieStore`) keeps the session; the service worker drops `Set-Cookie` |
 | Vite: `@php-wasm/universal` must be pre-bundled (CommonJS dependency `ini`); all PHP versions would be shipped | Only `@php-wasm/web` is excluded from pre-bundling; PHP versions other than 8.4 are aliased to a stub |
@@ -565,8 +565,8 @@ real Chrome does.
 - **Browser coverage:** Firefox and Safari are untested.
 - ~~A public URL~~ Done: <https://hermanpeeren.github.io/joomla-playground/>.
   - It is published to GitHub Pages by `.github/workflows/pages.yml`, started by hand.
-  - In headless Chrome it was ready in 5.9 s, downloads included: PHP after 1.9 s, Joomla downloaded by 3.9 s,
-    logged in at 5.9 s.
+  - In headless Chrome it was ready in 5.8s, downloads included: PHP after 1.9s, Joomla downloaded by 3.9s,
+    logged in at 5.9s.
 - **Blueprints and the query API.**
 
 ## 13. Phase 2, part 1: saving, export and import (2026-10-22)
@@ -600,8 +600,8 @@ A playground can now outlive the tab.
   - when the site is saved;
   - after a form submission (any request but GET and HEAD) that changed files, before the next request runs: a
     page that shows "Article saved." comes after the snapshot with the article;
-  - after other requests that changed files (sessions in the database, caches): 0.5 s after the last one, at most
-    5 s after the first;
+  - after other requests that changed files (sessions in the database, caches): 0.5s after the last one, at most
+    5s after the first;
   - when the page is hidden or closed (`visibilitychange`, `pagehide`).
   Snapshots run in the PHP request queue, so no request changes files while one is taken.
 - **Crash safety:** `createWritable()` writes to a temporary file that replaces the old snapshot only when it is
@@ -616,10 +616,10 @@ A playground can now outlive the tab.
   Deleting a site also deletes the bases that no other site uses.
 - **First version (before snapshots):** `@php-wasm/web` mounted an OPFS folder with all files of the site at the
   document root (`createDirectoryHandleMountHandler`), with an initial copy and a journal written after every
-  request. With ~8,600 files, saving took 13 s and reopening 7.6 s.
+  request. With ~8,600 files, saving took 13s and reopening 7.6s.
 - **One tab per saved site:** two PHP workers writing the same files would overwrite each other. A Web Lock
   (`navigator.locks`) per site enforces this. A second tab gets a message. After a reload, the new page waits up
-  to 5 s for the previous page's worker to let go.
+  to 5s for the previous page's worker to let go.
 - **Page and worker** talk through a small request/response protocol (boot, save, export).
 
 **Measured** (headless Chrome, local server; three runs of the browser tests, the last one while another build
@@ -627,16 +627,16 @@ ran on the same machine):
 
 | Action | First version (all files in OPFS) | Snapshots |
 |---|---|---|
-| New playground from the bundle (ready) | 2.3 s | 2.0–3.7 s |
-| Save | 13 s | 0.26–0.34 s |
+| New playground from the bundle (ready) | 2.3s | 2.0–3.7s |
+| Save | 13s | 0.26–0.34s |
 | Snapshot after a change (~156 KB zip) | (journal after every request) | 50–115 ms |
-| Reopen a saved site (ready) | 7.6 s, of which copying OPFS → memory is 5.4 s | 3.0–4.7 s: 1–2 s more than a new playground in the same run |
+| Reopen a saved site (ready) | 7.6s, of which copying OPFS → memory is 5.4s | 3.0–4.7s: 1–2s more than a new playground in the same run |
 | Export | 17.8 MB zip | 17.8 MB zip |
-| Import (ready) | 1.9 s | 2.2–3.0 s |
+| Import (ready) | 1.9s | 2.2–3.0s |
 
-Reopening now costs about what a new playground costs: reading the base from OPFS (0.1–0.8 s) replaces the
-download, and restoring the snapshot takes about 15 ms. Unpacking the base after a reload took 1.2–2.0 s, against
-0.8–1.4 s for a new playground; probably because the worker of the previous page is still shutting down. Most of
+Reopening now costs about what a new playground costs: reading the base from OPFS (0.1–0.8s) replaces the
+download, and restoring the snapshot takes about 15 ms. Unpacking the base after a reload took 1.2–2.0s, against
+0.8–1.4s for a new playground; probably because the worker of the previous page is still shutting down. Most of
 the snapshot is the SQLite database (2 MB, 0.15 MB compressed).
 
 **Tests:** the browser suite (10 tests) adds:
@@ -671,7 +671,7 @@ A link can now set up a new playground.
   (**Upload Package File**), as `multipart/form-data` encoded by the browser's `FormData`. Then it reads the
   messages Joomla queued; in Joomla 6 a successful install is a `success` message.
 - **Sample data** is installed like the Sample Data module does: `com_ajax` requests for step 1, 2, … of the
-  sample data plugin, until it has no further step. The blog sample data takes about 9 s.
+  sample data plugin, until it has no further step. The blog sample data takes about 9s.
 - `runSql`, `enableExtension` and `setSiteLanguage` boot Joomla's framework in a PHP script and use its database
   driver. SQL is therefore MySQL syntax, with `#__` as the table prefix, whichever driver the site uses.
 - **Downloads** need CORS headers from the host. Without them, the worker can retry through a CORS proxy set at
@@ -688,7 +688,7 @@ sample data steps, the warning made the JSON unreadable. The `mysqlonsqlite` dri
 (two builds per version, JSPI and Asyncify); a browser downloads only the one it uses.
 
 **Measured** (headless Chrome, local server): a blueprint with an extension install, sample data and five
-other steps on PHP 8.3 was ready in 12.8 s, of which the steps took 10.5 s.
+other steps on PHP 8.3 was ready in 12.8s, of which the steps took 10.5s.
 
 **Tests:** the browser suite (12 tests) adds:
 - a blueprint with all step types on PHP 8.3, logged out, landing on the front end;
@@ -745,11 +745,11 @@ Reported: in the administrator, the System pages made the playground hang (e.g. 
 installing the Blog Sample Data said "There is an error in a sample data plugin. Response is invalid."
 
 **Findings**
-- **System dashboard:** not the cause. It loads in about 1.4 s.
+- **System dashboard:** not the cause. It loads in about 1.4s.
 - **System > Install Languages** hung. Joomla reads the list of languages from update.joomla.org.
   - Without networking, `@php-wasm/web` gives PHP a WebSocket whose `send()` does nothing.
-  - curl has no timeout set (Joomla gives none), so it waited its default connect timeout of 300 s.
-  - All other requests waited behind it in the worker's queue. The service worker gave up on them after 120 s
+  - curl has no timeout set (Joomla gives none), so it waited its default connect timeout of 300s.
+  - All other requests waited behind it in the worker's queue. The service worker gave up on them after 120s
     (HTTP 503).
   - A per-request timeout in the queue would not help: a running PHP request cannot be stopped, and the single
     PHP instance can do nothing else meanwhile.
@@ -771,7 +771,7 @@ installing the Blog Sample Data said "There is an error in a sample data plugin.
 **What networking over fetch() can and cannot do.** The browser's CORS rules apply: a server must allow
 requests from another website.
 - update.joomla.org sends `Access-Control-Allow-Origin: *`. The language list, update lists and language details
-  load: Install Languages takes about 2 s.
+  load: Install Languages takes about 2s.
 - downloads.joomla.org (and the S3 bucket it redirects to) does not. A language pack download fails at once with
   Joomla's "Error connecting to the server: 400".
   - The playground's system plugin adds a notice on Install Languages that says so. It suggests uploading the zip
@@ -827,7 +827,7 @@ use the same proxy, when the playground has one.
 - `npm run proxy:dev` runs the proxy locally with Node, for development.
 
 **Verified end to end** (local proxy, headless Chrome): System > Install Languages > Dutch installs the language
-pack in about 4 s ("Installation of the language pack was successful"). PHP received the zip byte for byte
+pack in about 4s ("Installation of the language pack was successful"). PHP received the zip byte for byte
 (same MD5 as a direct download).
 
 **Tests:** proxy unit tests (9) for the appended URL form, the header, the exposed headers and host/path entries.
