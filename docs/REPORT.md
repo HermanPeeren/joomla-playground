@@ -1059,6 +1059,17 @@ limit, downloading at the same time saves little. On GitHub Pages it should save
 took 2 s there, during which nothing was downloaded. The plain playground already downloaded PHP and Joomla at the
 same time; at 9 MB/s, its 5.8 MB less is about 0.6 s.
 
+**Measured on GitHub Pages** after the deploy (fresh browser, no cache, three runs, until the first Joomla page):
+
+| | Before | After |
+|---|---|---|
+| Heritage demo (prebuilt) | 10.9 s (15.5 s once) | 7.4 s (5.6–7.7 s) |
+| Plain playground | about 6 s | 4.4 s (4.4–4.6 s) |
+
+The demo zip (23.1 MB) and PHP (7.4 MB) now download at the same time, from 0.9 to 3.5 s. Before, the zip started
+at 2.4 s, after the service worker, and PHP after the zip, until 7.8 s. The rest is PHP's own work: unpacking
+1.5 s, configuring and logging in 1.2 s, the first Joomla page about 1.2 s.
+
 **Found while measuring:** the first version of the test server sent a few bytes too few at times (a rounding
 error in its bandwidth limit), and Chrome aborted the download. With parallel downloads that hit the PHP binary,
 and the new version looked slower. Measured again after the fix.
