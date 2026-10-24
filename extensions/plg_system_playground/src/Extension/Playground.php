@@ -7,6 +7,7 @@
 
 namespace JoomlaPlayground\Plugin\System\Playground\Extension;
 
+use Joomla\CMS\Document\HtmlDocument;
 use Joomla\CMS\Event\Installer\BeforePackageDownloadEvent;
 use Joomla\CMS\Event\Model\PrepareFormEvent;
 use Joomla\CMS\Http\HttpFactory;
@@ -35,6 +36,7 @@ final class Playground extends CMSPlugin implements SubscriberInterface
     {
         return [
             'onAfterRoute'                     => 'onAfterRoute',
+            'onBeforeCompileHead'              => 'onBeforeCompileHead',
             'onContentPrepareForm'             => 'onContentPrepareForm',
             'onInstallerBeforePackageDownload' => 'onInstallerBeforePackageDownload',
         ];
@@ -74,6 +76,27 @@ final class Playground extends CMSPlugin implements SubscriberInterface
             && $app->isClient('administrator') && $option === 'com_installer' && $view === 'languages') {
             $app->enqueueMessage(Text::_('PLG_SYSTEM_PLAYGROUND_NO_LANGUAGE_DOWNLOADS'), 'warning');
         }
+    }
+
+    /**
+     * In the browser playground, Joomla's pages are in the playground's iframe, so their window.parent is the playground
+     * page instead of the page itself. A script that reloads "the parent" when its modal closes, e.g. the Patch
+     * Tester's Fetch Data (window.parent.location.reload()), would reload the whole playground: an unsaved one starts
+     * over, without what the modal did. Within that iframe, window.parent (a replaceable property) is the page itself,
+     * as in a browser tab of its own. Modals keep theirs: their parent is this page.
+     */
+    public function onBeforeCompileHead(): void
+    {
+        $document = $this->getApplication()->getDocument();
+
+        if (($_SERVER['JOOMLA_PLAYGROUND'] ?? '') !== 'browser' || !($document instanceof HtmlDocument)) {
+            return;
+        }
+
+        $document->getWebAssetManager()->addInlineScript(
+            "try { if (window.frameElement && window.frameElement.id === 'joomla') { window.parent = window; } } catch (e) {}",
+            ['name' => 'plg_system_playground.parent']
+        );
     }
 
     /**

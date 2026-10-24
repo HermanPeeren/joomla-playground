@@ -157,6 +157,9 @@ async function boot({ base, scope, joomla, site = null, title = null, zip = null
     lap('restore');
   }
 
+  // Before the journal starts: a change that is made at every start, not saved with the site.
+  trustPlaygroundCa(php, caRoot);
+
   // From here on, note every path below the document root that changes: those go into the snapshots.
   journalFSEvents(php, DOCUMENT_ROOT, (entry) => trackChange(changes, entry));
 
@@ -707,6 +710,30 @@ async function catchMail(command, processApi) {
 async function enableNetwork(php, caRoot) {
   php.writeFile(CA_BUNDLE, certificateToPEM(caRoot.certificate));
   await setPhpIniEntries(php, { 'openssl.cafile': CA_BUNDLE, 'curl.cainfo': CA_BUNDLE });
+}
+
+/**
+ * Joomla's own HTTP client (Joomla\CMS\Http\Transport\CurlTransport and StreamTransport, used by HttpFactory)
+ * always gives curl the CA bundle that comes with Joomla (composer/ca-bundle's cacert.pem), not the one php.ini
+ * names. Without this playground's CA in it, every HTTPS request through it failed with "self signed certificate in
+ * certificate chain": extension updates, the Patch Tester's GitHub requests, and so on. So the CA is added to that
+ * file too. A new CA is made at every start; the block of an earlier start (e.g. in an export) is replaced.
+ */
+function trustPlaygroundCa(php, caRoot) {
+  const file = `${DOCUMENT_ROOT}/libraries/vendor/composer/ca-bundle/res/cacert.pem`;
+
+  if (!php.fileExists(file)) {
+    return;
+  }
+
+  const begin = '# Joomla Playground CA: begin';
+  const end = '# Joomla Playground CA: end';
+  const text = php.readFileAsText(file);
+  const start = text.indexOf(begin);
+  const bundle = start === -1 ? text : text.slice(0, start) + text.slice(text.indexOf(end, start) + end.length);
+  const block = [begin, certificateToPEM(caRoot.certificate).trim(), end].join('\n');
+
+  php.writeFile(file, `${bundle.trimEnd()}\n\n${block}\n`);
 }
 
 /**

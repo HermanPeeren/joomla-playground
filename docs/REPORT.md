@@ -1074,7 +1074,44 @@ at 2.4 s, after the service worker, and PHP after the zip, until 7.8 s. The rest
 error in its bandwidth limit), and Chrome aborted the download. With parallel downloads that hit the PHP binary,
 and the new version looked slower. Measured again after the fix.
 
-## 28. Sources
+## 28. The Patch Tester (2026-10-24)
+
+Nicola Galgano installed the [Patch Tester](https://github.com/joomla-extensions/patchtester) in a playground and
+clicked Fetch Data, without GitHub credentials. He got "Could not connect to GitHub: SSL certificate problem: self
+signed certificate in certificate chain". Two playground problems were behind it. Neither needed a change to the
+Patch Tester or to a blueprint.
+
+- **Joomla's HTTP client did not trust the playground's certificates.** PHP's HTTPS requests go through
+  `fetch()`. @php-wasm ends the TLS connection itself, with a certificate signed by a CA that the playground makes
+  at every start, and php.ini (`openssl.cafile`, `curl.cainfo`) names that CA. Plain curl worked: a test against
+  api.github.com gave HTTP 200 on PHP 8.3 and 8.4. But Joomla's `CurlTransport` and `StreamTransport` always pass
+  the CA bundle that comes with Joomla (`libraries/vendor/composer/ca-bundle/res/cacert.pem`), unless the
+  `curl.certpath` or `stream.certpath` option is set. So every HTTPS request through `HttpFactory` failed:
+  extension updates, the Patch Tester's GitHub requests, and so on.
+  - The PHP worker now adds the playground's CA to that file at every start, between two marker lines. It does
+    this before the journal of a saved site starts, so the change is never saved. The block of an earlier start,
+    for example in an export, is replaced.
+- **Closing the modal reloaded the whole playground.** After the fix, the Patch Tester fetched all four pages of 100
+  open pull requests of joomla/joomla-cms, and the database had them. Then the list stayed
+  empty, on the dashboard.
+  - The Fetch Data modal closes with `window.parent.location.reload()`. On a normal site, the administrator page
+    is the top window, so its `window.parent` is the page itself. In the playground, the page sits in the
+    playground's iframe, so `window.parent` is the playground page. An unsaved playground then started over from
+    its blueprint, without the pull requests.
+  - The playground's system plugin now adds a line to every HTML page in that iframe: `window.parent = window`.
+    `parent` is a replaceable property, so this works. The page behaves as in a tab of its own; modals keep their
+    own parent, which is this page. (`window.top` cannot be replaced; no case of it has come up yet.)
+- **Tested:**
+  - In a playground with Patch Tester 5.0.1, Fetch Data ends on the Patch Tester's list, in the same playground,
+    with the pull requests: 20 per page.
+  - The browser test checks that a page in the frame is its own parent.
+  - In the blueprint test, a curl request to update.joomla.org with Joomla's CA bundle must give HTTP 200.
+  - The Patch Tester itself is not in the test: GitHub allows 60 requests an hour without a token, and CI shares
+    its addresses.
+- **Without a token**, GitHub allows 60 API requests an hour per IP address. One fetch of joomla-cms uses four.
+  A blueprint must never contain a token: anyone with the link could read it.
+
+## 29. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)
