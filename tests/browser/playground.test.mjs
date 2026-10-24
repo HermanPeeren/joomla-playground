@@ -75,6 +75,9 @@ describe('Joomla Playground in the browser', () => {
     await frame.click('text=Hide Forever', { timeout: 30000 });
     await frame.waitForSelector('text=Hide Forever', { state: 'detached', timeout: 30000 });
     assert.match(playground.siteUrl, /\/scope-[a-z0-9]+-\d+-\d+-\d+$/);
+    // A page's window.parent is the page itself, as in a tab of its own: reloading "the parent" (as the Patch Tester's
+    // Fetch Data does when its modal closes) reloads Joomla's page, not the playground.
+    assert.equal(await frame.evaluate(() => window.parent === window), true);
     assert.equal(playground.manifest.driver, 'mysqlonsqlite');
     console.log('boot timings (ms):', JSON.stringify(playground.timings));
   });
@@ -343,6 +346,13 @@ describe('Blueprints', () => {
                 'item'     => $db->query('SELECT title FROM jos_playgroundtest_items')->fetchColumn(),
                 'debug'    => $db->query("SELECT enabled FROM jos_extensions WHERE element = 'debug' AND folder = 'system'")->fetchColumn(),
                 'articles' => $db->query('SELECT COUNT(*) FROM jos_content')->fetchColumn(),
+                'joomlaCa' => (function () {
+                    // As Joomla's own HTTP client does it (CurlTransport): with the CA bundle that comes with Joomla.
+                    $curl = curl_init('https://update.joomla.org/language/translationlist_6.xml');
+                    curl_setopt_array($curl, [CURLOPT_RETURNTRANSFER => true, CURLOPT_NOBODY => true, CURLOPT_TIMEOUT => 30,
+                        CURLOPT_CAINFO => 'libraries/vendor/composer/ca-bundle/res/cacert.pem']);
+                    return curl_exec($curl) === false ? curl_error($curl) : curl_getinfo($curl, CURLINFO_HTTP_CODE);
+                })(),
             ]));`,
         },
       ],
@@ -374,6 +384,7 @@ describe('Blueprints', () => {
     assert.equal(String(check.check.lifetime), '240', 'Sessions last 4 hours');
     assert.equal(check.check.item, 'Changed by a blueprint');
     assert.equal(String(check.check.debug), '1');
+    assert.equal(String(check.check.joomlaCa), '200', "Joomla's CA bundle trusts the playground's certificates");
     assert.ok(Number(check.check.articles) > 5, `Sample data installed: ${check.check.articles} articles`);
     assert.equal(check.file, 'Written by a blueprint');
     assert.match(check.administrator, /mod-login-username|id="form-login"/, 'login=no: the administrator shows the login form');
