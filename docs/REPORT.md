@@ -1021,7 +1021,49 @@ every visitor.
   text is kept in `docs/demos/heritage-demo-article.html`, to come back later, preferably translated into each
   content language and linked as associations.
 
-## 27. Sources
+## 27. A faster start (2026-10-24)
+
+On the public site, a fresh browser took about 11–15 s to show the heritage demo, although the toolbar said "Ready in
+3.7 s". The rest was downloads, one after the other. Measured on GitHub Pages, without cache:
+
+| Time | What happened |
+|---|---|
+| 0.4–2.4 s | The service worker starts (first visit); nothing else |
+| 2.4–5.8 s | The page downloads the demo zip, 31.2 MB |
+| 6.4–7.8 s | The PHP worker downloads PHP, 7.4 MB (gzip) |
+| 7.9–9.8 s | Unpacking, configuring, logging in |
+| 9.8–10.9 s | The first Joomla page |
+
+**What changed**
+- **Everything starts at once.** The PHP worker starts right away and downloads PHP and the site (a bundle or a
+  prebuilt demo) together, while the service worker starts. Only the Joomla frame waits for the service worker.
+  This helps every playground.
+- **A third less to download.** `plugins/system/webauthn/fido.jwt` is the FIDO Alliance's metadata of passkey
+  devices: 10 MB, 5.6 MB compressed, almost a third of Joomla's bundle. The WebAuthn plugin only uses it to show
+  a device's name and icon, and ignores a file under 1 KB; passkeys keep working. The bundle build empties it
+  (deleting it would make `file_get_contents()` print a warning). Joomla 6.2's bundle: 18.6 MB → 12.8 MB.
+- **The demo without unused data.** The demo data plugin ships three datasets; the blueprint now removes the two
+  it does not use (battlefields, bees: 2.5 MB). The heritage one stays: its Uninstall needs it.
+- Together: the prebuilt heritage demo is 23.1 MB instead of 31.2 MB.
+
+**Measured** with a local server that limits all downloads together to 9 MB/s (as measured on GitHub Pages) and
+adds 40 ms per request, gzip like Pages; fresh browser, three runs, median until the first Joomla page:
+
+| | Before | After |
+|---|---|---|
+| Heritage demo (prebuilt) | 11.6 s | 9.2 s |
+| Plain playground | 7.3 s | 7.2 s |
+
+The parallel start alone made little difference locally (10.6 → 10.2 s for the demo): when the bandwidth is the
+limit, downloading at the same time saves little. On GitHub Pages it should save more, because the service worker
+took 2 s there, during which nothing was downloaded. The plain playground already downloaded PHP and Joomla at the
+same time; at 9 MB/s, its 5.8 MB less is about 0.6 s.
+
+**Found while measuring:** the first version of the test server sent a few bytes too few at times (a rounding
+error in its bandwidth limit), and Chrome aborted the download. With parallel downloads that hit the PHP binary,
+and the new version looked slower. Measured again after the fix.
+
+## 28. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)

@@ -87,6 +87,13 @@ setConfiguration($site . '/configuration.php', ['mailonline' => false, 'gzip' =>
 step('Removing build sources, caches and logs');
 $removed = 0;
 
+// The FIDO Alliance's metadata of passkey devices (10 MB, a third of the bundle): the WebAuthn plugin only uses it to
+// show a device's name and icon. Its MetadataRepository ignores a file under 1 KB; passkeys keep working. Emptied,
+// not deleted: file_get_contents() of a missing file would print a warning.
+if (is_file($site . '/plugins/system/webauthn/fido.jwt')) {
+    file_put_contents($site . '/plugins/system/webauthn/fido.jwt', '');
+}
+
 foreach (files($site . '/media') as $file) {
     if (preg_match('/\.(gz|scss|less|ts|map)$/', $file)) {
         unlink($file);

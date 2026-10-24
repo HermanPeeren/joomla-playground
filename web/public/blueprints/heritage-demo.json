@@ -96,6 +96,10 @@
       }
     },
     {
+      "step": "runPHP",
+      "code": "<?php\n// The other datasets of the plugin are not used here (the heritage one stays: Uninstall needs it). Leaving them out makes the prebuilt demo 2.5 MB smaller.\nforeach (['battlefields', 'bees'] as $dataset) {\n    $folder = 'plugins/demodata/features101/datasets/' . $dataset;\n    if (is_dir($folder)) {\n        $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($folder, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);\n        foreach ($files as $file) {\n            $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());\n        }\n        rmdir($folder);\n    }\n}"
+    },
+    {
       "step": "enableExtension",
       "element": "finder",
       "type": "plugin",
