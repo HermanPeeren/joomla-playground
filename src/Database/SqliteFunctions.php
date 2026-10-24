@@ -91,4 +91,68 @@ final class SqliteFunctions
     {
         return $value === null ? null : soundex($value);
     }
+
+    /**
+     * MySQL's FIND_IN_SET(str, strlist): the 1-based position of str in a comma-separated list, 0 when absent.
+     * Compares case-insensitively, as with the utf8mb4_unicode_ci collation Joomla's tables use.
+     */
+    public static function findInSet($needle, $list): ?int
+    {
+        if ($needle === null || $list === null) {
+            return null;
+        }
+
+        $needle = mb_strtolower((string) $needle);
+
+        if ((string) $list === '' || str_contains($needle, ',')) {
+            return 0;
+        }
+
+        $position = array_search($needle, array_map('mb_strtolower', explode(',', (string) $list)), true);
+
+        return $position === false ? 0 : $position + 1;
+    }
+
+    /**
+     * MySQL's CONVERT_TZ(dt, from_tz, to_tz) for offsets ('+05:30') and named zones ('Europe/Amsterdam').
+     * Returns NULL for an invalid argument, as MySQL does.
+     */
+    public static function convertTz(?string $datetime, ?string $from, ?string $to): ?string
+    {
+        if ($datetime === null || $from === null || $to === null) {
+            return null;
+        }
+
+        try {
+            $date = new \DateTimeImmutable($datetime, new \DateTimeZone($from));
+            $zone = new \DateTimeZone($to);
+        } catch (\Exception) {
+            return null;
+        }
+
+        return $date->setTimezone($zone)->format(str_contains($datetime, '.') ? 'Y-m-d H:i:s.u' : 'Y-m-d H:i:s');
+    }
+
+    /**
+     * MySQL's JSON_UNQUOTE(json_val). SQLite's JSON_EXTRACT() already returns strings unquoted, so a value that is
+     * not a JSON string literal is returned as it is.
+     */
+    public static function jsonUnquote($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = (string) $value;
+
+        if (\strlen($value) >= 2 && $value[0] === '"' && $value[-1] === '"') {
+            $decoded = json_decode($value);
+
+            if (\is_string($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return $value;
+    }
 }
