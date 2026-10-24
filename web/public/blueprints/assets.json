@@ -1,4 +1,7 @@
 {
+  "patchtester/com_patchtester.zip": {
+    "url": "https://github.com/joomla-extensions/patchtester/releases/download/5.0.1/com_patchtester_5.0.1.zip"
+  },
   "cefjdemos/mod_demodata.zip": {
     "url": "https://github.com/ceford/cefjdemos-mod-demodata/archive/refs/heads/main.zip",
     "folder": "mod_demodata"

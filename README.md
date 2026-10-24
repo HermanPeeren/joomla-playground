@@ -17,6 +17,11 @@ sent to a server.
   seconds, from a prebuilt copy of
   the site. Add `&fresh=1` to watch the blueprint build it in your browser instead: that takes about 45 seconds,
   plus a minute for the Smart Search index while you can already look around.
+- **Patch Tester:** <https://hermanpeeren.github.io/joomla-playground/?blueprint=patchtester>. Joomla with the
+  [Patch Tester](https://github.com/joomla-extensions/patchtester) installed. Click **Fetch Data** to get the open
+  pull requests of Joomla from GitHub, then **Apply Patch** to test one. Without a GitHub token in the Patch
+  Tester's Options, GitHub allows 60 requests an hour; one Fetch Data uses about four. Never put a token in a
+  blueprint: anyone with the link can read it.
 
 ## Logging in
 
