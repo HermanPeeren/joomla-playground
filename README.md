@@ -147,3 +147,32 @@ uses.
 ## License
 
 GNU General Public License version 2 or later, like Joomla and WordPress Playground.
+
+## Credits
+
+The playground runs on code from the WordPress community, both GPL-2.0-or-later like Joomla. No WordPress itself
+(core, plugins or themes) is used.
+
+- **[`@php-wasm`](https://github.com/WordPress/wordpress-playground)** (WordPress Playground, npm, version
+  3.1.60): PHP compiled to WebAssembly, the runtime the whole playground stands on.
+
+  | Package | Used for |
+  |---|---|
+  | `@php-wasm/web-8-3`, `-8-4`, `-8-5` | The compiled PHP binaries, with their extensions and ICU data |
+  | `@php-wasm/web` | Loading PHP in the browser, and PHP's network access through `fetch()` (`tcpOverFetch`) |
+  | `@php-wasm/universal` | The `PHP` class, `PHPRequestHandler` (a request becomes a PHP run), `setPhpIniEntries` |
+  | `@php-wasm/fs-journal` | Noting which files change, for saving a site as a small snapshot |
+  | `@php-wasm/util` | Catching `sendmail` for the Mail inbox |
+  | `@php-wasm/node` | Running Joomla with WebAssembly PHP in Node, for the integration tests |
+
+  Other packages come with them as dependencies, such as `@php-wasm/web-service-worker` and `@php-wasm/logger`.
+- **[`WP_MySQL_On_SQLite`](https://github.com/WordPress/sqlite-database-integration)** (`wordpress/mysql-on-sqlite`,
+  Composer, version 3.1.1): MySQL emulated on SQLite, in pure PHP. The default database driver, `mysqlonsqlite`,
+  is built on it, so Joomla runs its MySQL code and install SQL unchanged.
+
+Written for this playground, though several parts follow WordPress Playground's ideas: the page, the PHP worker
+and the service worker; the blueprints (in the shape of WordPress's Blueprints v1, with Joomla's own steps); the
+CORS proxy; both Joomla database drivers, the schema converter and the bundle builds.
+
+The demonstration data of the multilingual demo is by Clifford E Ford
+([plugin](https://github.com/ceford/cefjdemos-plg-demodata), [module](https://github.com/ceford/cefjdemos-mod-demodata)).
