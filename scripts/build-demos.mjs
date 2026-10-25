@@ -5,7 +5,7 @@
 // Needs the built playground: npm run bundle && npm run web:build && npm run demos
 //
 // Output (in web/dist/demos/):
-//   <name>.zip    the export of the site (as the toolbar's Export makes it)
+//   <name>.zip    the export of the site (as the toolbar's Export makes it, with the bundle's empty media files)
 //   <name>.json   { blueprint: <SHA-256 of the blueprint file>, joomla, php, built, seconds }
 // The page uses the export only while the blueprint file is unchanged (the same SHA-256).
 
@@ -64,7 +64,8 @@ try {
       throw new Error(`${name}: ${status}`);
     }
 
-    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 300000 }), page.click('#export-site')]);
+    // Without Joomla's media files: the playground serves them from the bundle, and the demo downloads faster.
+    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 300000 }), page.evaluate(() => window.joomlaPlaygroundExport({ media: false }))]);
 
     await download.saveAs(`${dist}/demos/${name}.zip`);
 
