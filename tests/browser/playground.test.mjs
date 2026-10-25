@@ -297,6 +297,22 @@ describe('Joomla Playground in the browser', () => {
     assert.ok(statSync(file).size > 5_000_000, 'The export holds the whole site');
     console.log(`export: ${(statSync(file).size / 1048576).toFixed(1)} MB`);
 
+    // Joomla's media files are real, not the bundle's placeholders: the export runs on a server as it is.
+    const media = JSON.parse(execFileSync('php', ['-r', `
+      $zip = new ZipArchive();
+      $zip->open($argv[1]);
+      $empty = 0;
+      for ($index = 0; $index < $zip->numFiles; $index++) {
+          $stat = $zip->statIndex($index);
+          $empty += str_starts_with($stat['name'], 'media/') && $stat['size'] === 0;
+      }
+      echo json_encode(['fontawesome' => $zip->statName('media/system/css/joomla-fontawesome.min.css')['size'], 'empty' => $empty]);
+    `, file]).toString());
+
+    console.log(`export media: ${JSON.stringify(media)}`);
+    assert.ok(media.fontawesome > 0, 'media/system/css/joomla-fontawesome.min.css has content');
+    assert.ok(media.empty < 10, `${media.empty} empty files in media/`);
+
     // A new temporary playground does not have the article...
     await page.goto(appUrl);
     const fresh = await waitForPlayground(page);
@@ -311,6 +327,22 @@ describe('Joomla Playground in the browser', () => {
 
     assert.equal(playground.site, null);
     assert.ok(await siteShows(page, playground, 'Written in the browser'), 'The imported site has the article');
+
+    // Saved, the imported site keeps placeholders for the media files: its base is not the export's size.
+    page.once('dialog', (dialog) => dialog.accept('Imported site'));
+    await page.click('#save-site');
+    await page.waitForFunction(() => location.search === '?site=imported-site', null, { timeout: 120000 });
+
+    const baseSize = await page.evaluate(async () => {
+      const root = await (await navigator.storage.getDirectory()).getDirectoryHandle('joomla-playground');
+      const meta = await (await (await (await root.getDirectoryHandle('sites')).getDirectoryHandle('imported-site')).getFileHandle('meta.json')).getFile();
+      const { base } = JSON.parse(await meta.text());
+
+      return (await (await (await root.getDirectoryHandle('bases')).getFileHandle(`${base}.zip`)).getFile()).size;
+    });
+
+    console.log(`base of the imported site: ${(baseSize / 1048576).toFixed(1)} MB`);
+    assert.ok(baseSize < statSync(file).size - 5_000_000, `The base (${baseSize} bytes) has no media files`);
   });
 
 describe('Blueprints', () => {
@@ -537,7 +569,7 @@ describe('Blueprints', () => {
     assert.ok(found, 'Smart Search finds a heritage article');
 
     // Export it, as scripts/build-demos.mjs does, as the prebuilt demo for the next test.
-    const [download] = await Promise.all([tab.waitForEvent('download', { timeout: 300000 }), tab.click('#export-site')]);
+    const [download] = await Promise.all([tab.waitForEvent('download', { timeout: 300000 }), tab.evaluate(() => window.joomlaPlaygroundExport({ media: false }))]);
     const blueprint = readFileSync(`${root}/web/dist/blueprints/heritage-demo.json`);
 
     mkdirSync(`${root}/web/dist/demos`, { recursive: true });

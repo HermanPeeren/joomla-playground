@@ -582,7 +582,9 @@ A playground can now outlive the tab.
   PHP's memory instead of downloading the bundle. Each saved site keeps its Super User password.
 - **My sites** lists the saved sites, which can be opened or deleted.
 - **Export** downloads the whole site as a zip, without caches, logs or temporary files. The zip comment
-  records the Joomla version and driver.
+  records the Joomla version and driver. Joomla's media files, empty placeholders in the site, are downloaded
+  from the bundle into the zip, so an export runs on a server as it is; an import empties them again (they are
+  marked with a zip entry comment), so a saved import does not store them in OPFS.
 - **Import** starts a new, temporary playground from such a zip; it can then be saved again. Importing an
   export of another Joomla version gives a warning, because the media files come from the playground's own
   bundle.

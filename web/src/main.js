@@ -182,8 +182,9 @@ function show(path = '/administrator/') {
     })
     .catch((error) => setStatus(`The service worker did not start: ${error.message}`, true));
 
-  // For tests and debugging.
+  // For tests and debugging; the export for scripts/build-demos.mjs.
   window.joomlaPlayground = playground;
+  window.joomlaPlaygroundExport = exportSite;
 }
 
 async function saveSite() {
@@ -211,12 +212,17 @@ async function saveSite() {
   }
 }
 
-async function exportSite() {
+/**
+ * @param {object} [options]
+ * @param {boolean} [options.media] Whether the zip gets the real content of Joomla's media files, so it runs on a
+ *                                  server as it is; scripts/build-demos.mjs leaves the bundle's placeholders.
+ */
+async function exportSite({ media = true } = {}) {
   setBusy(true);
   setStatus('Exporting the site');
 
   try {
-    const bytes = await call('exportSite');
+    const bytes = await call('exportSite', { media });
     const name = `${playground.site ?? 'joomla-playground'}-${new Date().toISOString().slice(0, 10)}.zip`;
     const link = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(new Blob([bytes], { type: 'application/zip' })),
@@ -511,7 +517,7 @@ async function start() {
   elements.php.replaceChildren(...PHP_VERSIONS.map((version) => new Option(version, version)));
   elements.php.onchange = switchPhp;
   elements.save.onclick = saveSite;
-  elements.exportSite.onclick = exportSite;
+  elements.exportSite.onclick = () => exportSite();
   elements.importSite.onclick = () => elements.importFile.click();
   elements.importFile.onchange = () => elements.importFile.files[0] && importSite(elements.importFile.files[0]);
   elements.sitesMenu.ontoggle = () => elements.sitesMenu.open && renderSites();

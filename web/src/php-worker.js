@@ -26,6 +26,9 @@ const PREPEND_FILE = '/internal/shared/playground-prepend.php';
 /** Caches, logs and temporary files: left out of exports and snapshots (a PHP regular expression). */
 const SKIP = '#^(tmp|cache|administrator/cache|administrator/logs)/(?!index\\.html$)#';
 
+/** The zip comment of a media file in an export that the bundle has: an import empties it again (see exportSite()). */
+const MEDIA_COMMENT = 'joomla-playground:bundle-media';
+
 /**
  * After a form submission (any method but GET and HEAD) that changed files, a snapshot is written before the next
  * request runs. After other requests (sessions, caches) it is written this long after the last one that changed
@@ -42,7 +45,7 @@ const channel = new BroadcastChannel('joomla-playground');
  *          that were renamed (moved with all their files)
  * dirty:   whether files changed since the last snapshot
  *
- * @type {{php: PHP, phpVersion: string, handler: PHPRequestHandler, manifest: object, password: string, site: string|null,
+ * @type {{php: PHP, phpVersion: string, handler: PHPRequestHandler, manifest: object, bundleUrl: string, password: string, site: string|null,
  *   base: {id: string|null, bytes: Uint8Array|null}, changes: {paths: Set<string>, trees: Set<string>}, dirty: boolean}}
  */
 let state = null;
@@ -132,19 +135,36 @@ async function boot({ base, scope, joomla, site = null, title = null, zip = null
   progress(meta ? 'Opening the saved site' : 'Unpacking Joomla');
   php.mkdir(DOCUMENT_ROOT);
   php.writeFile('/tmp/site.zip', files.bytes);
-  await runPhp(php, `
+  const unpacked = await runPhp(php, `
     $zip = new ZipArchive();
     if ($zip->open('/tmp/site.zip') !== true || !$zip->extractTo('${DOCUMENT_ROOT}')) {
         throw new RuntimeException('Cannot unpack the site');
     }
     // An export says which Joomla version and driver it holds (see exportSite()).
     file_put_contents('/tmp/archive-comment.json', (string) $zip->getArchiveComment());
+    // The media files an export got from the bundle: placeholders again, as in the bundle. The service worker serves
+    // them from the bundle.
+    $emptied = 0;
+    for ($index = 0; $index < $zip->numFiles; $index++) {
+        if ($zip->getCommentIndex($index) === ${JSON.stringify(MEDIA_COMMENT)}) {
+            file_put_contents('${DOCUMENT_ROOT}/' . $zip->getNameIndex($index), '');
+            $emptied++;
+        }
+    }
     $zip->close();
-    unlink('/tmp/site.zip');
     if (!is_file('${DOCUMENT_ROOT}/configuration.php') || !is_file('${DOCUMENT_ROOT}/data/joomla.sqlite')) {
         throw new RuntimeException('This zip is not a Joomla Playground export');
     }
+    echo $emptied;
   `);
+
+  php.unlink('/tmp/site.zip');
+
+  // The base of the site when it is saved: the export with those placeholders.
+  if (Number(unpacked.text) > 0) {
+    files.bytes = withoutBundleMedia(files.bytes);
+  }
+
   lap('unpack');
 
   const changes = { paths: new Set(), trees: new Set() };
@@ -215,6 +235,7 @@ async function boot({ base, scope, joomla, site = null, title = null, zip = null
     phpVersion,
     handler: createHandler(),
     manifest,
+    bundleUrl,
     password,
     site: null,
     base: { id: meta?.base ?? null, bytes: meta ? null : files.bytes },
@@ -573,36 +594,222 @@ async function restoreSnapshot(php, bytes) {
 
 /**
  * Zips the site (without caches, logs and temporary files) as a download.
+ *
+ * The site's core media files are empty placeholders (see bin/build-browser-bundle.php); an export gets their real
+ * content from the bundle, so it runs on a server as it is. Those entries carry the comment MEDIA_COMMENT, and an
+ * import empties them again (see boot()). With media: false, the placeholders stay (prebuilt demos).
  */
-async function exportSite() {
+async function exportSite({ media = true } = {}) {
   if (!state) {
     throw new Error('The playground is not running');
   }
 
   const comment = JSON.stringify({ joomlaPlayground: 1, joomla: state.manifest.joomla, driver: state.manifest.driver, exported: new Date().toISOString() });
+  const started = performance.now();
+  const fetched = media ? await bundleMedia() : new Map();
+  const downloaded = performance.now();
 
-  await serialized(() =>
-    runPhp(state.php, `
-      $root = '${DOCUMENT_ROOT}';
-      $skip = ${JSON.stringify(SKIP)};
-      $zip  = new ZipArchive();
+  await serialized(() => {
+    for (const [relative, bytes] of fetched) {
+      state.php.mkdir(`/tmp/export-media/${relative.slice(0, relative.lastIndexOf('/'))}`);
+      state.php.writeFile(`/tmp/export-media/${relative}`, bytes);
+    }
+
+    return runPhp(state.php, `
+      $root  = '${DOCUMENT_ROOT}';
+      $media = '/tmp/export-media';
+      $skip  = ${JSON.stringify(SKIP)};
+      $zip   = new ZipArchive();
       $zip->open('/tmp/export.zip', ZipArchive::CREATE | ZipArchive::OVERWRITE);
       $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS));
       foreach ($files as $file) {
           $relative = substr($file->getPathname(), strlen($root) + 1);
-          if ($file->isFile() && !preg_match($skip, $relative)) {
+          if (!$file->isFile() || preg_match($skip, $relative)) {
+              continue;
+          }
+          // Still a placeholder (an extension may have written the file since the download).
+          if ($file->getSize() === 0 && is_file($media . '/' . $relative)) {
+              $zip->addFile($media . '/' . $relative, $relative);
+              $zip->setCommentName($relative, ${JSON.stringify(MEDIA_COMMENT)});
+              // The fastest compression: these are ~30 MB, mostly scripts and styles.
+              $zip->setCompressionName($relative, ZipArchive::CM_DEFLATE, 1);
+          } else {
               $zip->addFile($file->getPathname(), $relative);
           }
       }
       $zip->setArchiveComment(${JSON.stringify(comment)});
       $zip->close();
-    `)
-  );
+      $remove = function (string $path) use (&$remove) {
+          if (is_dir($path)) {
+              array_map(fn ($name) => $remove($path . '/' . $name), array_diff(scandir($path), ['.', '..']));
+              rmdir($path);
+          } elseif (is_file($path)) {
+              unlink($path);
+          }
+      };
+      $remove($media);
+    `);
+  });
 
   const bytes = state.php.readFileAsBuffer('/tmp/export.zip');
   state.php.unlink('/tmp/export.zip');
+  console.debug(`Export: ${bytes.length} bytes, ${fetched.size} media files from the bundle (${Math.round(downloaded - started)} ms), in ${Math.round(performance.now() - started)} ms`);
 
   return { value: bytes.buffer, transfer: [bytes.buffer] };
+}
+
+/**
+ * The content of the site's empty media files that the bundle has (joomla/<version>/media/), by relative path.
+ * Downloaded outside the request queue, so the site keeps answering meanwhile.
+ */
+async function bundleMedia() {
+  const response = await serialized(() =>
+    runPhp(state.php, `
+      $root  = '${DOCUMENT_ROOT}';
+      $empty = [];
+      if (is_dir($root . '/media')) {
+          $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root . '/media', FilesystemIterator::SKIP_DOTS));
+          foreach ($files as $file) {
+              if ($file->isFile() && $file->getSize() === 0) {
+                  $empty[] = substr($file->getPathname(), strlen($root) + 1);
+              }
+          }
+      }
+      echo json_encode($empty);
+    `)
+  );
+  const paths = JSON.parse(response.text);
+  const total = paths.length;
+  const fetched = new Map();
+  let done = 0;
+
+  progress(`Exporting the site: Joomla's media files (0 of ${total})`);
+
+  // A few downloads at a time: enough to fill the connection, without hundreds of requests waiting.
+  const next = async () => {
+    for (let relative = paths.pop(); relative; relative = paths.pop()) {
+      const bytes = await bundleFile(new URL(relative, state.bundleUrl));
+
+      if (bytes?.length) {
+        fetched.set(relative, bytes);
+      }
+
+      if (++done % 100 === 0) {
+        progress(`Exporting the site: Joomla's media files (${done} of ${total})`);
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: 12 }, next));
+  progress('Exporting the site');
+
+  return fetched;
+}
+
+/**
+ * A file of the static bundle, or null when the bundle does not have it (a 404, or a development server's index
+ * page instead).
+ */
+async function bundleFile(url) {
+  const response = await fetch(url);
+  const fallbackPage = response.headers.get('content-type')?.includes('text/html') && !/\.html?$/.test(url.pathname);
+
+  if (!response.ok || fallbackPage) {
+    return null;
+  }
+
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+/**
+ * A copy of an export whose entries with the comment MEDIA_COMMENT are empty: the other entries are copied as they
+ * are, without unpacking them. (Replacing the entries with ZipArchive takes minutes in WebAssembly, or fails.)
+ * A zip it cannot read (Zip64) is returned as it is.
+ */
+function withoutBundleMedia(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let end = bytes.length - 22;
+
+  while (end >= 0 && view.getUint32(end, true) !== 0x06054b50) {
+    end--;
+  }
+
+  const count = end >= 0 ? view.getUint16(end + 10, true) : 0xffff;
+  const directory = end >= 0 ? view.getUint32(end + 16, true) : 0xffffffff;
+
+  if (count === 0xffff || directory === 0xffffffff) {
+    return bytes;
+  }
+
+  // The central directory: per entry its record, where its local header starts, and whether it is a media file.
+  const entries = [];
+
+  for (let offset = directory, index = 0; index < count; index++) {
+    const length = 46 + view.getUint16(offset + 28, true) + view.getUint16(offset + 30, true) + view.getUint16(offset + 32, true);
+    const nameEnd = offset + 46 + view.getUint16(offset + 28, true);
+    const comment = new TextDecoder().decode(bytes.subarray(nameEnd + view.getUint16(offset + 30, true), offset + length));
+
+    entries.push({ record: bytes.subarray(offset, offset + length), name: bytes.subarray(offset + 46, nameEnd), local: view.getUint32(offset + 42, true), media: comment === MEDIA_COMMENT });
+    offset += length;
+  }
+
+  // An entry's local part (header, data, data descriptor) ends where the next one starts.
+  const starts = [...entries.map((entry) => entry.local), directory].sort((a, b) => a - b);
+  const next = new Map(starts.map((start, index) => [start, starts[index + 1]]));
+  const parts = [];
+  const records = [];
+  let size = 0;
+
+  for (const entry of entries) {
+    const record = new Uint8Array(entry.media ? 46 + entry.name.length : entry.record.length);
+    const fields = new DataView(record.buffer);
+
+    if (entry.media) {
+      // Stored, empty: no CRC, no sizes, no extra field or comment. Version, flags (only UTF-8 names), time and
+      // attributes as before.
+      record.set(entry.record.subarray(0, 46));
+      record.set(entry.name, 46);
+      fields.setUint16(8, fields.getUint16(8, true) & 0x800, true);
+      fields.setUint16(10, 0, true);
+      fields.setUint32(16, 0, true);
+      fields.setUint32(20, 0, true);
+      fields.setUint32(24, 0, true);
+      fields.setUint16(30, 0, true);
+      fields.setUint16(32, 0, true);
+
+      const local = new Uint8Array(30 + entry.name.length);
+      const header = new DataView(local.buffer);
+
+      header.setUint32(0, 0x04034b50, true);
+      local.set(record.subarray(6, 30), 4);
+      header.setUint16(28, 0, true);
+      local.set(entry.name, 30);
+      parts.push(local);
+    } else {
+      record.set(entry.record);
+      parts.push(bytes.subarray(entry.local, next.get(entry.local)));
+    }
+
+    fields.setUint32(42, size, true);
+    size += parts.at(-1).length;
+    records.push(record);
+  }
+
+  const eocd = bytes.slice(end);
+  const eocdFields = new DataView(eocd.buffer);
+
+  eocdFields.setUint32(12, records.reduce((total, record) => total + record.length, 0), true);
+  eocdFields.setUint32(16, size, true);
+
+  const zip = new Uint8Array(size + eocdFields.getUint32(12, true) + eocd.length);
+  let offset = 0;
+
+  for (const part of [...parts, ...records, eocd]) {
+    zip.set(part, offset);
+    offset += part.length;
+  }
+
+  return zip;
 }
 
 /**
