@@ -89,6 +89,22 @@ final class MysqlOnSqliteDriverTest extends TestCase
         $query->select($query->groupConcat($query->castAs('CHAR', 'title')))->from('#__items');
 
         $this->assertSame('a,b', $this->db->setQuery($query)->loadResult());
+
+        // GROUP_CONCAT() with SEPARATOR, several expressions and ORDER BY (patches/mysql-on-sqlite-group-concat.patch).
+        $query = $this->db->createQuery();
+        $query->select($query->groupConcat('title', '; '))->from('#__items');
+        $this->assertSame('a; b', $this->db->setQuery($query)->loadResult());
+        $this->assertSame('a1,b2', $this->db->setQuery('SELECT GROUP_CONCAT(title, id) FROM `#__items`')->loadResult());
+
+        $sqlite = $this->db->getConnection()->get_sqlite_pdo()->query('SELECT sqlite_version()')->fetchColumn();
+        $orderBy = "SELECT GROUP_CONCAT(title ORDER BY id DESC SEPARATOR '|') FROM `#__items`";
+
+        if (version_compare($sqlite, '3.44.0', '>=')) {
+            $this->assertSame('b|a', $this->db->setQuery($orderBy)->loadResult());
+        } else {
+            $this->expectExceptionMessage('GROUP_CONCAT() with ORDER BY requires SQLite 3.44.0 or newer');
+            $this->db->setQuery($orderBy)->loadResult();
+        }
     }
 
     public function testNumRowsCountsTheRowsOfASelect(): void
