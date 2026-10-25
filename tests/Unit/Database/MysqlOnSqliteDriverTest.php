@@ -74,6 +74,13 @@ final class MysqlOnSqliteDriverTest extends TestCase
         $this->assertSame('09:00 AM', $this->db->setQuery("SELECT TIME_FORMAT('2026-10-22 09:05:07', '%h:00 %p')")->loadResult());
         $this->assertSame('a:b', $this->db->setQuery("SELECT CONCAT_WS(':', 'a', NULL, 'b')")->loadResult());
         $this->assertSame('R163', $this->db->setQuery("SELECT SOUNDEX('Robert')")->loadResult());
+        $this->assertSame(2, (int) $this->db->setQuery("SELECT FIND_IN_SET('b', 'a,B,c')")->loadResult());
+        $this->assertSame(0, (int) $this->db->setQuery("SELECT FIND_IN_SET('d', 'a,b,c')")->loadResult());
+        $this->assertSame('2025-12-31 22:30:00', $this->db->setQuery("SELECT CONVERT_TZ('2026-01-01 03:30:00', '+00:00', '-05:00')")->loadResult());
+        $this->assertSame('2025-12', $this->db->setQuery("SELECT DATE_FORMAT(CONVERT_TZ('2026-01-01 03:30:00', '+00:00', '-05:00'), '%Y-%m')")->loadResult());
+        $this->assertNull($this->db->setQuery("SELECT CONVERT_TZ('2026-01-01 03:30:00', '+00:00', 'Nowhere/Else')")->loadResult());
+        $this->assertSame('hi', $this->db->setQuery("SELECT JSON_UNQUOTE(JSON_EXTRACT('{\"text\":\"hi\"}', '$.text'))")->loadResult());
+        $this->assertSame('hi', $this->db->setQuery("SELECT JSON_UNQUOTE('\"hi\"')")->loadResult());
         $this->assertSame('', $this->db->getConnectionEncryption());
         $this->assertSame('16777216', $this->db->setQuery('SHOW VARIABLES LIKE ' . $this->db->quote('max_heap_table_size'))->loadObject()->Value);
 
