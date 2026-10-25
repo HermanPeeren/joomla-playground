@@ -22,6 +22,8 @@ sent to a server.
   pull requests of Joomla from GitHub, then **Apply Patch** to test one. Without a GitHub token in the Patch
   Tester's Options, GitHub allows 60 requests an hour; one Fetch Data uses about four. Never put a token in a
   blueprint: anyone with the link can read it.
+- **Weblinks:** <https://hermanpeeren.github.io/joomla-playground/?blueprint=weblinks>. Joomla with the
+  [Weblinks](https://github.com/joomla-extensions/weblinks) installed.
 
 ## Logging in
 
