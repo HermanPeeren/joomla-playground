@@ -10,20 +10,8 @@ namespace JoomlaPlayground\Database\MysqlOnSqlite;
 use Joomla\Database\Mysql\MysqlQuery;
 
 /**
- * Joomla's MySQL query builder, minus the syntax that WP_MySQL_On_SQLite 3.1.1 does not translate yet.
+ * Joomla's MySQL query builder, under the name the database factory looks for.
  */
 class MysqlOnSqliteQuery extends MysqlQuery
 {
-    /**
-     * The emulator passes GROUP_CONCAT(... SEPARATOR ...) to SQLite untranslated. Without SEPARATOR the default
-     * comma applies, in MySQL as in SQLite.
-     */
-    public function groupConcat($expression, $separator = ',')
-    {
-        if ($separator === ',') {
-            return 'GROUP_CONCAT(' . $expression . ')';
-        }
-
-        return parent::groupConcat($expression, $separator);
-    }
 }

@@ -1,0 +1,17 @@
+{
+    "_hash": "6621735763fce548cc724abd7ca526d93e87ebe52bdddb08bb7b97a8b6af0c0f",
+    "patches": {
+        "wordpress/mysql-on-sqlite": [
+            {
+                "package": "wordpress/mysql-on-sqlite",
+                "description": "Translate GROUP_CONCAT() with SEPARATOR, ORDER BY and several expressions (until it is in a release; see patches/README.md)",
+                "url": "patches/mysql-on-sqlite-group-concat.patch",
+                "sha256": "ec8c5837d5af6fa71518146ded19ffc586098b61a0e8e08c12f4e1c0f0a298af",
+                "depth": 1,
+                "extra": {
+                    "provenance": "root"
+                }
+            }
+        ]
+    }
+}

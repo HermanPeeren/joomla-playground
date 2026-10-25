@@ -26,6 +26,7 @@
     "require": {
         "php": "^8.3",
         "ext-pdo_sqlite": "*",
+        "cweagans/composer-patches": "^2.0",
         "wordpress/mysql-on-sqlite": "3.1.1"
     },
     "require-dev": {
@@ -48,6 +49,19 @@
         "test:integration": "phpunit --testsuite integration"
     },
     "config": {
-        "sort-packages": true
+        "sort-packages": true,
+        "allow-plugins": {
+            "cweagans/composer-patches": true
+        }
+    },
+    "extra": {
+        "patches": {
+            "wordpress/mysql-on-sqlite": [
+                {
+                    "description": "Translate GROUP_CONCAT() with SEPARATOR, ORDER BY and several expressions (until it is in a release; see patches/README.md)",
+                    "url": "patches/mysql-on-sqlite-group-concat.patch"
+                }
+            ]
+        }
     }
 }
