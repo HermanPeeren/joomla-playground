@@ -1,0 +1,17 @@
+{
+  "meta": {
+    "title": "Weblinks",
+    "description": "Joomla with the Weblinks (joomla-extensions/weblinks) installed.",
+    "author": "Joomla Playground"
+  },
+  "preferredVersions": {
+    "joomla": "6.2"
+  },
+  "landingPage": "/administrator/index.php?option=com_weblinks",
+  "steps": [
+    {
+      "step": "installExtension",
+      "url": "assets/weblinks/pkg_weblinks.zip"
+    }
+  ]
+}
