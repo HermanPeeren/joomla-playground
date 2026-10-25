@@ -138,6 +138,43 @@ Downloads (`extension`, `installExtension`, `unzip`) need a host that allows it 
 GitHub Pages or raw.githubusercontent.com; release downloads on GitHub do not. URLs in a blueprint are relative
 to the blueprint. If a step fails, the playground still starts and the toolbar shows the error.
 
+## Putting an exported site on a server
+
+An export (**Export** in the toolbar) is a complete Joomla site that runs on SQLite, with the playground's
+database driver and its database in `data/joomla.sqlite`. It runs on an ordinary PHP web server, without MySQL.
+That is fine for a demo or test site. Joomla itself does not support SQLite, so for a real site, move it to MySQL.
+
+You need PHP 8.3 or newer with `pdo_sqlite`, and the Full Package of the same Joomla version as the playground
+(the toolbar shows it, for example 6.2.0), from [downloads.joomla.org](https://downloads.joomla.org/).
+
+1. **Unpack** the export in the web root (here: `site`), and the Full Package in a folder next to it (here:
+   `joomla-package`).
+2. **Add Joomla's media files.** In an export, the files in `media/` that come with Joomla are empty: the
+   playground serves them separately. Files of installed extensions are complete. Delete the empty files, then
+   copy the Full Package's `media/` without replacing existing files:
+
+   ```bash
+   find site/media -type f -empty -delete
+   cp -rn joomla-package/media/. site/media/
+   ```
+
+3. **Edit `configuration.php`:**
+   - `$live_site = '';`
+   - `$tmp_path` and `$log_path`: the full paths of `tmp` and `administrator/logs` on the server;
+   - `$secret`: a new random string. The playground's is the same in every playground.
+4. **Protect the database.** `data/joomla.sqlite` holds the whole site, password hashes included. On Apache,
+   `data/.htaccess` blocks it. On nginx, add a rule that denies `/data/`, or move the file outside the web root
+   and set `$db` in `configuration.php` to its path. PHP must be able to write the file *and* the `data` folder.
+5. **Set a new password** for the Super User. The playground's password was public in its toolbar:
+
+   ```bash
+   php cli/joomla.php user:reset-password --username=admin
+   ```
+
+Optionally, remove the playground's certificate from
+`libraries/vendor/composer/ca-bundle/res/cacert.pem`: the block between the two "Joomla Playground CA" lines.
+Its private key is gone, so it does no harm, and the next Joomla update replaces the file anyway.
+
 ## Running your own copy
 
 The playground is a static website: build it once and host it on any web server with HTTPS, such as GitHub
