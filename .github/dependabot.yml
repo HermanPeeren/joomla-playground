@@ -1,0 +1,21 @@
+# Every day: is there a newer @php-wasm release than the playground uses? Then Dependabot opens one pull request that
+# updates all @php-wasm packages together (they must have the same version). Its CI runs the unit, integration and
+# browser tests. PHP security releases reach the playground this way: a new @php-wasm release brings the new PHP
+# builds. After merging, run "Deploy the playground" to publish them.
+#
+# Only @php-wasm is watched; other npm packages are updated by hand.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: daily
+    allow:
+      - dependency-name: '@php-wasm/*'
+    groups:
+      php-wasm:
+        patterns:
+          - '@php-wasm/*'
+    commit-message:
+      prefix: '@php-wasm'
+    labels: []

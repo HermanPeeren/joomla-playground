@@ -73,6 +73,9 @@ Then open http://localhost:5400/.
   General > "Allow GitHub Actions to create and approve pull requests"; without it, an issue with a
   compare link). CI does not start by itself on a pull request opened by the workflow: close and reopen it.
   After merging, run **Deploy the playground**.
+- **PHP updates** come with `@php-wasm` releases, which bring the new PHP builds (security releases included).
+  Dependabot (`.github/dependabot.yml`) checks every day and opens one pull request that updates all `@php-wasm`
+  packages together. CI runs on it as usual. After merging, run **Deploy the playground**.
 - `npm run web:dev` serves the playground.
 - `npm run web:build` writes a static site to `web/dist/`, which any static web server can host. Service workers
   need `localhost` or HTTPS.
