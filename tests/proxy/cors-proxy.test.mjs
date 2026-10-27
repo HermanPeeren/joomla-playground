@@ -24,7 +24,7 @@ function upstream(routes) {
   return asked;
 }
 
-function get(url, { origin = 'https://hermanpeeren.github.io', method = 'GET' } = {}) {
+function get(url, { origin = 'https://joomla-projects.github.io', method = 'GET' } = {}) {
   return new Request(`https://proxy.example/?url=${encodeURIComponent(url)}`, { method, headers: { origin } });
 }
 
@@ -54,7 +54,7 @@ describe('CORS proxy', () => {
     });
 
     const response = await proxy.fetch(
-      new Request('https://proxy.example/https://update.joomla.org/language/details6/nl-NL_details.xml?a=1&b=2', { headers: { origin: 'https://hermanpeeren.github.io' } })
+      new Request('https://proxy.example/https://update.joomla.org/language/details6/nl-NL_details.xml?a=1&b=2', { headers: { origin: 'https://joomla-projects.github.io' } })
     );
 
     assert.equal(response.status, 200);
@@ -104,13 +104,13 @@ describe('CORS proxy', () => {
   test('limits origins when ALLOWED_ORIGINS is set', async () => {
     upstream({ 'https://update.joomla.org/core/list.xml': () => new Response('<xml/>') });
 
-    const env = { ALLOWED_ORIGINS: 'https://hermanpeeren.github.io' };
+    const env = { ALLOWED_ORIGINS: 'https://joomla-projects.github.io' };
     const allowed = await proxy.fetch(get('https://update.joomla.org/core/list.xml'), env);
     const other = await proxy.fetch(get('https://update.joomla.org/core/list.xml', { origin: 'https://other.example' }), env);
-    const preflight = await proxy.fetch(new Request('https://proxy.example/', { method: 'OPTIONS', headers: { origin: 'https://hermanpeeren.github.io' } }), env);
+    const preflight = await proxy.fetch(new Request('https://proxy.example/', { method: 'OPTIONS', headers: { origin: 'https://joomla-projects.github.io' } }), env);
 
     assert.equal(allowed.status, 200);
-    assert.equal(allowed.headers.get('access-control-allow-origin'), 'https://hermanpeeren.github.io');
+    assert.equal(allowed.headers.get('access-control-allow-origin'), 'https://joomla-projects.github.io');
     assert.equal(other.status, 403);
     assert.equal(preflight.status, 204);
   });

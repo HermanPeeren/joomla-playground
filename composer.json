@@ -1,5 +1,5 @@
 {
-    "name": "hermanpeeren/joomla-playground",
+    "name": "joomla-projects/joomla-playground",
     "description": "Joomla running in the browser via PHP-in-WebAssembly, comparable to WordPress Playground",
     "type": "project",
     "license": "GPL-2.0-or-later",

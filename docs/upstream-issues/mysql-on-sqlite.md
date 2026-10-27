@@ -477,7 +477,7 @@ as a comment once an issue for prepared statements exists.
 > 3. **`rowCount()` for `SELECT`:** PDO MySQL returns the number of rows for buffered queries; the emulator returns
 >    `0`, like PDO SQLite. Joomla's `getNumRows()` relies on it in a few places.
 >
-> Our implementation is in [`EmulatedPreparedStatement`](https://github.com/HermanPeeren/joomla-playground/blob/main/src/Database/MysqlOnSqlite/EmulatedPreparedStatement.php),
+> Our implementation is in [`EmulatedPreparedStatement`](https://github.com/joomla-projects/joomla-playground/blob/main/src/Database/MysqlOnSqlite/EmulatedPreparedStatement.php),
 > in case it is useful.
 
 The link points to the `main` branch of joomla-playground, where the driver has been merged.

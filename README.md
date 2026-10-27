@@ -3,7 +3,7 @@
 A complete Joomla site in your browser tab: no server, no installation, no account. Try a Joomla version, test
 an idea, show something to someone, and throw it away, or keep it in your browser for later.
 
-**Open it:** <https://hermanpeeren.github.io/joomla-playground/>
+**Open it:** <https://joomla-projects.github.io/joomla-playground/>
 
 After a few seconds you see Joomla's administrator, already logged in as a Super User. Everything runs in your
 browser: PHP is compiled to WebAssembly, and the site and its database live in the tab's memory. Nothing is
@@ -11,18 +11,18 @@ sent to a server.
 
 ## Demos
 
-- **Multilingual site:** <https://hermanpeeren.github.io/joomla-playground/?blueprint=heritage-demo>. A site in
+- **Multilingual site:** <https://joomla-projects.github.io/joomla-playground/?blueprint=heritage-demo>. A site in
   English, Dutch, German, French and Spanish, with content about UNESCO World Heritage sites from the
   [demonstration data](https://github.com/ceford/cefjdemos-plg-demodata) of Clifford E Ford. It starts in a few
   seconds, from a prebuilt copy of
   the site. Add `&fresh=1` to watch the blueprint build it in your browser instead: that takes about 45 seconds,
   plus a minute for the Smart Search index while you can already look around.
-- **Patch Tester:** <https://hermanpeeren.github.io/joomla-playground/?blueprint=patchtester>. Joomla with the
+- **Patch Tester:** <https://joomla-projects.github.io/joomla-playground/?blueprint=patchtester>. Joomla with the
   [Patch Tester](https://github.com/joomla-extensions/patchtester) installed. Click **Fetch Data** to get the open
   pull requests of Joomla from GitHub, then **Apply Patch** to test one. Without a GitHub token in the Patch
   Tester's Options, GitHub allows 60 requests an hour; one Fetch Data uses about four. Never put a token in a
   blueprint: anyone with the link can read it.
-- **Weblinks:** <https://hermanpeeren.github.io/joomla-playground/?blueprint=weblinks>. Joomla with
+- **Weblinks:** <https://joomla-projects.github.io/joomla-playground/?blueprint=weblinks>. Joomla with
   [Weblinks](https://github.com/joomla-extensions/weblinks) installed, the component for a directory of links that
   used to be part of Joomla. It opens on its list in the administrator.
 

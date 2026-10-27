@@ -5,7 +5,7 @@ compatibility_date = "2026-10-01"
 
 [vars]
 # Origins that may use the proxy; "*" allows any.
-ALLOWED_ORIGINS = "https://hermanpeeren.github.io,http://localhost:5400"
+ALLOWED_ORIGINS = "https://joomla-projects.github.io,http://localhost:5400"
 
 # 60 requests per minute per client IP.
 [[ratelimits]]

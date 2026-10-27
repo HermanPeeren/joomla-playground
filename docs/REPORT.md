@@ -42,7 +42,7 @@ already been done by the WordPress Playground team and can be reused.
 - **Update, 2026-10-22: step 3 is done (first version).** Joomla runs in a browser tab: no server-side PHP, and
   it is ready about 2s after the page loads (locally). The administrator is logged in automatically. The site,
   the administrator, forms, AJAX and static media work, and Chrome browser tests cover them. See §12.
-- **Public playground:** <https://hermanpeeren.github.io/joomla-playground/> (GitHub Pages). It is ready about 6s after the page loads, downloads included.
+- **Public playground:** <https://joomla-projects.github.io/joomla-playground/> (GitHub Pages; until 27 October 2026 at hermanpeeren.github.io). It is ready about 6s after the page loads, downloads included.
 - **Update, 2026-10-22: phase 2, part 2.** A link sets up a new playground: PHP version (8.3, 8.4, 8.5),
   landing page, login, extensions to install, or a whole blueprint with steps such as sample data, global
   configuration and SQL. See §14.
@@ -563,7 +563,7 @@ real Chrome does.
 - **Speed:** OPcache and JSPI.
 - **Smaller downloads:** strip `libraries/vendor`; `php -w`.
 - **Browser coverage:** Firefox and Safari are untested.
-- ~~A public URL~~ Done: <https://hermanpeeren.github.io/joomla-playground/>.
+- ~~A public URL~~ Done: <https://joomla-projects.github.io/joomla-playground/>.
   - It is published to GitHub Pages by `.github/workflows/pages.yml`, started by hand.
   - In headless Chrome it was ready in 5.8s, downloads included: PHP after 1.9s, Joomla downloaded by 3.9s,
     logged in at 5.9s.
@@ -893,7 +893,7 @@ System > Install Languages now installs language packs, without a CORS proxy.
 
 ## 24. A multilingual demo from a blueprint (2026-10-23)
 
-<https://hermanpeeren.github.io/joomla-playground/?blueprint=heritage-demo> sets up a multilingual site with
+<https://joomla-projects.github.io/joomla-playground/?blueprint=heritage-demo> sets up a multilingual site with
 Clifford E Ford's [demonstration data plugin](https://github.com/ceford/cefjdemos-plg-demodata) and
 [module](https://github.com/ceford/cefjdemos-mod-demodata): the *heritage* dataset (UNESCO World Heritage sites)
 in English, Dutch, German, French and Spanish. It follows the setup of the plugin's README. (A first version also
