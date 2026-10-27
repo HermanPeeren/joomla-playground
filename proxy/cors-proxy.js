@@ -13,7 +13,7 @@
 //
 // Only GET and HEAD, only https, only the hosts in ALLOWED_HOSTS (also after redirects), at most MAX_BYTES.
 // Deploy: see docs/DEVELOPMENT.md. Settings (wrangler.toml [vars], all optional):
-//   ALLOWED_ORIGINS  comma-separated origins that may use the proxy, e.g. "https://hermanpeeren.github.io";
+//   ALLOWED_ORIGINS  comma-separated origins that may use the proxy, e.g. "https://joomla-projects.github.io";
 //                    default "*" (any)
 //   ALLOWED_HOSTS    comma-separated hosts to replace the default list; "*.example.org" includes subdomains,
 //                    "host/path" allows only URLs below that path on a shared host

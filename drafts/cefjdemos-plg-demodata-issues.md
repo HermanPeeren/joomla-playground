@@ -160,7 +160,7 @@ The workflow step also uses `PLG_DEMODATA_USER_STEP_FAILED` (line 2573) where a 
 ## Possibly useful for testing
 
 The Joomla Playground can run the whole setup in a browser, without a server:
-<https://hermanpeeren.github.io/joomla-playground/?blueprint=heritage-demo&fresh=1>. The blueprint
+<https://joomla-projects.github.io/joomla-playground/?blueprint=heritage-demo&fresh=1>. The blueprint
 (`web/public/blueprints/heritage-demo.json`) follows the setup of the plugin's README. On a plain playground,
 installing the module and plugin by hand now works too: the module's JavaScript file was not served before, which
 was a playground bug, now fixed.
