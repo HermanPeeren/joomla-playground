@@ -1116,7 +1116,16 @@ Patch Tester or to a blueprint.
 - **Without a token**, GitHub allows 60 API requests an hour per IP address. One fetch of joomla-cms uses four.
   A blueprint must never contain a token: anyone with the link could read it.
 
-## 29. Sources
+## 29. Other PHP runtimes: keep @php-wasm (2026-10-28)
+
+Is Sean Morris's [php-wasm](https://github.com/seanmorris/php-wasm) better for a Joomla Playground than WordPress's
+`@php-wasm`? No: it is about twice as slow for a Joomla page (1.02 s against 0.44 s for the front page, in
+Node.js), ships PHP 8.4.1 from November 2024, uses 32-bit integers, and has no outgoing HTTP from PHP, which the
+playground needs. `@php-wasm` is not tied to old PHP either: it ships PHP 7.4 to 8.5. What is worth evaluating is the
+database: Llewellyn van der Merwe's bridge runs real MariaDB in the browser. Comparison, measurements and an
+evaluation plan for MariaDB: [PHP-RUNTIMES.md](PHP-RUNTIMES.md).
+
+## 30. Sources
 
 - WordPress Playground: [site](https://wordpress.org/playground/) · [docs](https://developer.wordpress.org/playground/) · [developer docs](https://developer.wordpress.org/playground/developers/) · [repo](https://github.com/WordPress/wordpress-playground) (clone in `research/wordpress-playground`) · [tools](https://github.com/WordPress/playground-tools) · [binary-size post, 2026-03](https://make.wordpress.org/playground/2026/03/11/how-wordpress-playground-cut-php-wasm-binary-sizes-by-122-mb/) · [web.dev article](https://web.dev/articles/wordpress-playground) · [self-hosting](https://developer.wordpress.org/playground/developers/architecture/host-your-own-playground/)
 - SQLite translator: [sqlite-database-integration](https://github.com/WordPress/sqlite-database-integration) · [new AST driver, 2025-06](https://make.wordpress.org/playground/2025/06/13/introducing-a-new-sqlite-driver-for-wordpress/)
