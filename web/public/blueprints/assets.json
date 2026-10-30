@@ -36,6 +36,12 @@
         "replace": "        $oddjob_id = $db->loadResult();\n",
         "with": "        $oddjob_id = $db->loadResult();\n\n        // Not every dataset has this group.\n        if (!$oddjob_id) {\n            return;\n        }\n",
         "why": "the heritage dataset has no group Oddjob: the Special view level got the rules [6,3,8,], invalid JSON, and the administrator menu disappeared"
+      },
+      {
+        "file": "src/Extension/Features101.php",
+        "replace": "                    ->where($db->quoteName('id') . '=' . $ids['en-GB']);\n",
+        "with": "                    ->where($db->quoteName('id') . '=' . $ids['en-GB'])\n                    ->where($db->quoteName('context') . '=' . $db->quote($association['context']));\n",
+        "why": "the lookup of an existing association group ignored the context: the categories with the ids 15 to 20 took over and deleted the groups of the articles with the same ids, so the language switcher went to the home page on six articles"
       }
     ]
   }
