@@ -42,6 +42,12 @@
         "replace": "                    ->where($db->quoteName('id') . '=' . $ids['en-GB']);\n",
         "with": "                    ->where($db->quoteName('id') . '=' . $ids['en-GB'])\n                    ->where($db->quoteName('context') . '=' . $db->quote($association['context']));\n",
         "why": "the lookup of an existing association group ignored the context: the categories with the ids 15 to 20 took over and deleted the groups of the articles with the same ids, so the language switcher went to the home page on six articles"
+      },
+      {
+        "file": "datasets/heritage/en-gb/elements/usergroups.json",
+        "replace": "    \"parent\":\"Committee\"\n}]",
+        "with": "    \"parent\":\"Committee\"\n},\n{\n    \"title\":\"Magazine Reviewers\",\n    \"parent\":\"Registered\"\n}]",
+        "why": "user maggie is in the group Magazine Reviewers, which the heritage dataset did not create, so step 3 (users) failed"
       }
     ]
   }
