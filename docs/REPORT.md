@@ -906,7 +906,7 @@ see §26.)
 3. `addModule` Language Switcher (flags, position `topbar`).
 4. `installExtension` the module, and `addModule` it on the Home Dashboard (position `cpanel`).
 5. `installExtension` the plugin; `enableExtension` with its options: dataset `heritage`, the five languages.
-6. `addUserGroup` "Magazine Reviewers" (see below).
+6. (Removed: `addUserGroup` "Magazine Reviewers"; now a patch of the dataset, see below.)
 7. `importSampleData` with `group: "demodata"`: the 16 steps the module's Install button runs.
 8. (Removed, see §26: `addArticle` "About this multilingual demo".)
 
@@ -922,17 +922,20 @@ see §26.)
 
 **Found in the demonstration data plugin** (version 0.3.1). None of these come from the playground; they would
 fail on a Linux server or with MySQL's strict mode as well. Until they are fixed upstream, the playground's copy
-is patched (`patches` in `assets.json`), or the blueprint works around them:
+is patched (`patches` in `assets.json`); each patch switches itself off when the original text is gone. All of them
+are reported to the author, with a fix for each: issues ceford/cefjdemos-plg-demodata#1–#9, pull requests #10–#18
+(2026-10-30, version 0.3.2).
 
 | Problem | Effect | In the playground |
 |---|---|---|
-| The heritage users include one in the group "Magazine Reviewers", which the dataset does not create | Step 3 (users) fails: "cannot save account without groups" | The blueprint adds the group first |
+| The heritage users include one in the group "Magazine Reviewers", which the dataset does not create | Step 3 (users) fails: "cannot save account without groups" | Patched: the group added to the dataset's `usergroups.json` (before, the blueprint added it; that would clash with the fix upstream) |
 | `createModel('NewsFeed', …)`: the class is `NewsfeedModel` | On a case-sensitive file system (Linux) no model is found: step 11 (newsfeeds) fails | Patched |
 | The completion step sends a private message from user "superman" to "playwright"; the heritage dataset has neither | Invalid SQL (`user_id_from = ,`): step 16 fails | Patched: skipped without those users |
 | It stores a privacy consent for user "johndoe", who is not in the heritage dataset | `''` as a user id: rejected by MySQL's strict mode and by SQLite | Patched: skipped without that user |
 | It adds group "Oddjob", which the heritage dataset does not have, to the Special view level | The rules became `[6,3,8,]`, invalid JSON: Joomla could not work out a user's view levels, and the administrator's menu and toolbar buttons disappeared | Patched: skipped without that group |
 | The workflow transitions refer to a stage "Published"; the stage is called "Article published!" | PHP warnings, transitions without a stage | Not fixed; the demo does not use the workflows |
 | No language string `PLG_DEMODATA_USER_STEP_FAILED` | Error messages show the key only | Not fixed |
+| The lookup of an existing association group ignores the context; categories 15–20 have the ids of six articles | The six articles lose their associations: the language switcher goes to the home page | Patched: the lookup filters on the context |
 
 **Measured** on the public playground (headless Chrome), from opening the link: ready after 84–98 s. One run:
 
